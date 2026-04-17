@@ -737,8 +737,13 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             
         case RLMPropertyTypeObject:
             return [NSNull null];
-            
+
         case RLMPropertyTypeLinkingObjects:
+            return [NSNull null];
+
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID:
             return [NSNull null];
     }
 }

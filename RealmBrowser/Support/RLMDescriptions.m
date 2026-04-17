@@ -177,9 +177,14 @@ typedef NS_ENUM(int32_t, RLMDescriptionFormat) {
         
         case RLMPropertyTypeLinkingObjects:
             return @"<LinkingObjects>";
-            
+
         case RLMPropertyTypeObject:
             return [self descriptionOfObject:propertyValue format:format];
+
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID:
+            return [propertyValue description] ?: @"";
     }
 }
 
@@ -206,6 +211,12 @@ typedef NS_ENUM(int32_t, RLMDescriptionFormat) {
             return @"LinkingObjects";
         case RLMPropertyTypeObject:
             return [NSString stringWithFormat:@"<%@>", property.objectClassName];
+        case RLMPropertyTypeObjectId:
+            return @"ObjectId";
+        case RLMPropertyTypeDecimal128:
+            return @"Decimal128";
+        case RLMPropertyTypeUUID:
+            return @"UUID";
     }
 }
 
@@ -246,6 +257,9 @@ typedef NS_ENUM(int32_t, RLMDescriptionFormat) {
         case RLMPropertyTypeData:
         case RLMPropertyTypeDate:
         case RLMPropertyTypeInt:
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID:
             return nil;
     }
 }
