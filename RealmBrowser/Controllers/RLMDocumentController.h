@@ -17,13 +17,10 @@
 ////////////////////////////////////////////////////////////////////////////
 
 @import Cocoa;
-@import Realm;
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface RLMDocumentController : NSDocumentController
-
-- (void)openDocumentWithContentsOfSyncURL:(NSURL *)url credentials:(RLMSyncCredentials *)credentials authServerURL:(NSURL * __nullable)authServerURL display:(BOOL)displayDocument completionHandler:(void (^)(NSDocument * __nullable document, BOOL documentWasAlreadyOpen, NSError * __nullable error))completionHandler;
 
 @end
 

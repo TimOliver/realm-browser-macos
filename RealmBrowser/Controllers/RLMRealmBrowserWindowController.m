@@ -19,15 +19,12 @@
 @import Realm;
 @import Realm.Private;
 @import Realm.Dynamic;
-@import RealmConverter;
 
 #import "RLMRealmBrowserWindowController.h"
 #import "RLMNavigationStack.h"
 #import "RLMModelExporter.h"
 #import "RLMExportIndicatorWindowController.h"
 #import "RLMEncryptionKeyWindowController.h"
-#import "RLMLoginWindowController.h"
-#import "RLMConnectionIndicatorWindowController.h"
 #import "RLMBrowserConstants.h"
 
 NSString * const kRealmLockedImage = @"RealmLocked";
@@ -39,8 +36,6 @@ NSString * const kRealmKeyIsLockedForRealm = @"LockedRealm:%@";
 NSString * const kRealmKeyWindowFrameForRealm = @"WindowFrameForRealm:%@";
 NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
-static void const *kWaitForDocumentSchemaLoadObservationContext;
-
 @interface RLMRealmBrowserWindowController()<NSWindowDelegate>
 
 @property (atomic, weak) IBOutlet NSSplitView *splitView;
@@ -50,8 +45,6 @@ static void const *kWaitForDocumentSchemaLoadObservationContext;
 
 @property (nonatomic, strong) RLMExportIndicatorWindowController *exportWindowController;
 @property (nonatomic, strong) RLMEncryptionKeyWindowController *encryptionController;
-@property (nonatomic, strong) RLMLoginWindowController *loginWindowController;
-@property (nonatomic, strong) RLMConnectionIndicatorWindowController *connectionIndicatorWindowController;
 
 @property (nonatomic, strong) RLMNotificationToken *documentNotificationToken;
 
@@ -107,14 +100,6 @@ static void const *kWaitForDocumentSchemaLoadObservationContext;
 
         case RLMDocumentStateNeedsEncryptionKey:
             [self handleEncryption];
-            break;
-
-        case RLMDocumentStateLoading:
-            [self waitForDocumentLoaded];
-            break;
-
-        case RLMDocumentStateNeedsValidCredentials:
-            [self handleSyncCredentials];
             break;
 
         case RLMDocumentStateLoaded:
@@ -200,70 +185,6 @@ static void const *kWaitForDocumentSchemaLoadObservationContext;
     }];
 }
 
-- (void)waitForDocumentLoaded {
-    [self showLoadingIndicator];
-    [self.document addObserver:self forKeyPath:@"state" options:NSKeyValueObservingOptionNew context:&kWaitForDocumentSchemaLoadObservationContext];
-}
-
-- (void)cancelDocumentLoading {
-    [self.document removeObserver:self forKeyPath:@"state"];
-}
-
-- (void)documentLoaded {
-    [self.document removeObserver:self forKeyPath:@"state"];
-    [self hideLoadingIndicator];
-    [self handleDocumentState];
-}
-
-- (void)handleSyncCredentials {
-    self.loginWindowController = [[RLMLoginWindowController alloc] init];
-    self.loginWindowController.credentials = self.document.credentials;
-
-    [self.loginWindowController showSheetForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
-        if (returnCode == NSModalResponseOK) {
-            [self showLoadingIndicator];
-
-            [self.document loadWithCredentials:self.loginWindowController.credentials completionHandler:^(NSError *error) {
-                [self hideLoadingIndicator];
-
-                // TODO: handle error code properly
-                if (error != nil) {
-                    [[NSAlert alertWithError:error] beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
-                        [self handleSyncCredentials];
-                    }];
-                } else {
-                    [self handleDocumentState];
-                }
-            }];
-        } else {
-            [self.document close];
-        }
-
-        self.loginWindowController = nil;
-    }];
-}
-
-- (void)showLoadingIndicator {
-    if (self.connectionIndicatorWindowController.isWindowVisible) {
-        return;
-    }
-
-    self.connectionIndicatorWindowController = [[RLMConnectionIndicatorWindowController alloc] init];
-
-    [self.connectionIndicatorWindowController showSheetForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
-        if (returnCode == NSModalResponseCancel) {
-            [self cancelDocumentLoading];
-            [self.document close];
-        }
-
-        self.connectionIndicatorWindowController = nil;
-    }];
-}
-
-- (void)hideLoadingIndicator {
-    [self.connectionIndicatorWindowController closeWithReturnCode:NSModalResponseOK];
-}
-
 - (void)handleUnrecoverableError {
     NSAlert *alert;
 
@@ -279,18 +200,6 @@ static void const *kWaitForDocumentSchemaLoadObservationContext;
     [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
         [self.document close];
     }];
-}
-
-#pragma mark - KVO
-
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSString *,id> *)change context:(void *)context {
-    if (context == &kWaitForDocumentSchemaLoadObservationContext) {
-        if (self.document.state != RLMDocumentStateLoading) {
-            [self documentLoaded];
-        }
-    } else {
-        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
-    }
 }
 
 #pragma mark - Public methods - Accessors
@@ -335,7 +244,7 @@ static void const *kWaitForDocumentSchemaLoadObservationContext;
 
 - (IBAction)exportToCompactedRealm:(id)sender
 {
-    NSString *fileName = self.document.fileURL.lastPathComponent ?: self.document.syncURL.lastPathComponent ?: @"Compacted";
+    NSString *fileName = self.document.fileURL.lastPathComponent ?: @"Compacted";
 
     if (![fileName.pathExtension isEqualToString:kRealmFileExtension]) {
         fileName = [fileName.stringByDeletingPathExtension stringByAppendingPathExtension:kRealmFileExtension];
@@ -354,33 +263,6 @@ static void const *kWaitForDocumentSchemaLoadObservationContext;
         [panel orderOut:nil];
 
         [self exportAndCompactCopyOfRealmFileAtURL:panel.URL];
-    }];
-}
-
-- (IBAction)exportToCSV:(id)sender
-{
-    NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.canCreateDirectories = YES;
-    panel.canChooseDirectories = YES;
-    panel.canChooseFiles = NO;
-    panel.message = @"Choose the directory in which to save the CSV files generated from this Realm file.";
-    panel.prompt = @"Export";
-
-    [panel beginSheetModalForWindow:self.window completionHandler:^(NSInteger result) {
-        if (result != NSFileHandlingPanelOKButton) {
-            return;
-        }
-
-        [panel orderOut:nil];
-
-        RLMCSVDataExporter *exporter = [[RLMCSVDataExporter alloc] initWithRealm:self.document.presentedRealm.realm];
-
-        NSError *error = nil;
-        if (![exporter exportToFolderAtPath:panel.URL.path withError:&error]) {
-            [NSApp presentError:error];
-        } else {
-            [[NSWorkspace sharedWorkspace] openURL:panel.URL];
-        }
     }];
 }
 

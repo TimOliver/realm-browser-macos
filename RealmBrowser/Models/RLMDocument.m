@@ -22,18 +22,11 @@
 #import "RLMDocument.h"
 #import "RLMBrowserConstants.h"
 #import "RLMRealmBrowserWindowController.h"
-#import "RLMSyncUtils.h"
 
 @interface RLMDocument ()
 
 @property (nonatomic, strong) NSURL *securityScopedURL;
-
-@property (nonatomic, copy) NSURL *syncURL;
-@property (nonatomic, copy) NSURL *authServerURL;
-@property (nonatomic, strong) RLMSyncCredentials *credentials;
 @property (nonatomic, strong) NSError *error;
-
-@property (nonatomic, strong) RLMSyncUser *user;
 
 @end
 
@@ -45,11 +38,11 @@
         return nil;
     }
 
-    if (absoluteURL.isFileURL) {
-        return [self initWithContentsOfFileURL:absoluteURL error:outError];
-    } else {
-        return [self initWithContentsOfSyncURL:absoluteURL credentials:nil authServerURL:nil error:outError];
+    if (!absoluteURL.isFileURL) {
+        return nil;
     }
+
+    return [self initWithContentsOfFileURL:absoluteURL error:outError];
 }
 
 - (instancetype)initWithContentsOfFileURL:(NSURL *)fileURL error:(NSError **)outError {
@@ -92,22 +85,6 @@
     return self;
 }
 
-- (instancetype)initWithContentsOfSyncURL:(NSURL *)syncURL credentials:(RLMSyncCredentials *)credentials authServerURL:(NSURL *)authServerURL error:(NSError **)outError {
-    self = [super init];
-
-    if (self != nil) {
-        self.syncURL = syncURL;
-        self.authServerURL = authServerURL ?: authServerURLForSyncURL(syncURL);
-        self.state = RLMDocumentStateNeedsValidCredentials;
-
-        if (credentials != nil) {
-            [self loadWithCredentials:credentials completionHandler:nil];
-        }
-    }
-
-    return self;
-}
-
 - (void)dealloc {
     if (self.securityScopedURL != nil) {
         //In certain instances, RLMRealm's C++ destructor method will attempt to clean up
@@ -140,62 +117,6 @@
     return [self loadWithError:error];
 }
 
-- (void)loadWithCredentials:(RLMSyncCredentials *)credentials completionHandler:(void (^)(NSError *error))completionHandler {
-    // Workaround for access token auth, state will be set to RLMDocumentStateUnrecoverableError in case of invalid token
-    NSAssert(self.state == RLMDocumentStateNeedsValidCredentials || self.state == RLMDocumentStateUnrecoverableError, @"Invalid document state");
-
-    completionHandler = completionHandler ?: ^(NSError *error) {};
-
-    self.credentials = credentials;
-    self.state = RLMDocumentStateLoading;
-
-    __weak typeof(self) weakSelf = self;
-    [RLMSyncUser logInWithCredentials:self.credentials authServerURL:self.authServerURL onCompletion:^(RLMSyncUser *user, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (!weakSelf) {
-                return;
-            } else if (user == nil) {
-                weakSelf.state = RLMDocumentStateNeedsValidCredentials;
-
-                // FIXME: workaround for https://github.com/realm/realm-cocoa-private/issues/204
-                if (error.code == RLMSyncAuthErrorHTTPStatusCodeError && [[error.userInfo valueForKey:@"statusCode"] integerValue] == 400) {
-                    NSMutableDictionary *userInfo = [error.userInfo mutableCopy];
-
-                    [userInfo setValue:@"Invalid credentials." forKey:NSLocalizedDescriptionKey];
-                    [userInfo setValue:@"Please check your authentication credentials and that you have an access to the specified URL." forKey:NSLocalizedRecoverySuggestionErrorKey];
-
-                    NSError *authenticationError = [[NSError alloc] initWithDomain:error.domain code:error.code userInfo:userInfo];
-
-                    completionHandler(authenticationError);
-                } else {
-                    completionHandler(error);
-                }
-            } else {
-                weakSelf.user = user;
-
-                RLMRealmConfiguration *configuration = [[RLMRealmConfiguration alloc] init];
-                configuration.dynamic = YES;
-                configuration.syncConfiguration = [[RLMSyncConfiguration alloc] initWithUser:weakSelf.user realmURL:weakSelf.syncURL];
-                configuration.syncConfiguration.enableSSLValidation = NO;
-
-                [RLMRealm asyncOpenWithConfiguration:configuration callbackQueue:dispatch_get_main_queue() callback:^(RLMRealm *realm, NSError *error) {
-                    if (!weakSelf) {
-                        return;
-                    } else if (error) {
-                        weakSelf.state = RLMDocumentStateUnrecoverableError;
-                    } else {
-                        weakSelf.presentedRealm = [[RLMRealmNode alloc] initWithConfiguration:configuration];
-
-                        [weakSelf loadWithError:&error];
-                    }
-
-                    completionHandler(error);
-                }];
-            }
-        });
-    }];
-}
-
 - (BOOL)loadWithError:(NSError **)outError {
     NSAssert(self.presentedRealm != nil, @"Presented Realm must be created before loading");
 
@@ -214,7 +135,7 @@
             case RLMErrorFileFormatUpgradeRequired:
             self.state = RLMDocumentStateRequiresFormatUpgrade;
             break;
-            
+
             default:
             self.state = RLMDocumentStateUnrecoverableError;
             break;
@@ -259,7 +180,7 @@
 
 - (NSString *)displayName
 {
-    return self.syncURL ? self.syncURL.absoluteString : self.fileURL.lastPathComponent.stringByDeletingPathExtension;
+    return self.fileURL.lastPathComponent.stringByDeletingPathExtension;
 }
 
 @end

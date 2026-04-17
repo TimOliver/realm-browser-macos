@@ -24,10 +24,35 @@
 @property (nonatomic, weak) IBOutlet NSButton *okayButton;
 
 @property (nonatomic, strong) NSData *encryptionKey;
+@property (nonatomic, copy) void (^sheetCompletionHandler)(NSModalResponse returnCode);
 
 @end
 
 @implementation RLMEncryptionKeyWindowController
+
+- (instancetype)init {
+    return [super initWithWindowNibName:@"EncryptionKeyWindow"];
+}
+
+- (void)showSheetForWindow:(NSWindow *)window completionHandler:(void (^)(NSModalResponse returnCode))completionHandler {
+    self.sheetCompletionHandler = completionHandler;
+
+    [window beginSheet:self.window completionHandler:^(NSModalResponse returnCode) {
+        if (self.sheetCompletionHandler) {
+            self.sheetCompletionHandler(returnCode);
+            self.sheetCompletionHandler = nil;
+        }
+    }];
+}
+
+- (void)closeWithReturnCode:(NSModalResponse)returnCode {
+    NSWindow *sheetParent = self.window.sheetParent;
+    if (sheetParent) {
+        [sheetParent endSheet:self.window returnCode:returnCode];
+    } else {
+        [self.window close];
+    }
+}
 
 - (void)controlTextDidChange:(NSNotification *)notification {
     NSString *stringValue = self.keyTextField.stringValue;
@@ -43,6 +68,10 @@
     self.encryptionKey = encryptionKey;
 
     [self closeWithReturnCode:NSModalResponseOK];
+}
+
+- (IBAction)cancelButtonClicked:(id)sender {
+    [self closeWithReturnCode:NSModalResponseCancel];
 }
 
 // http://stackoverflow.com/a/13627835/599344
