@@ -16,10 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import "RLMWindowController.h"
+#import <Cocoa/Cocoa.h>
 
-@interface RLMEncryptionKeyWindowController : RLMWindowController
+@interface RLMEncryptionKeyWindowController : NSWindowController
 
 @property (readonly) NSData *encryptionKey;
+
+- (void)showSheetForWindow:(NSWindow *)window completionHandler:(void (^)(NSModalResponse returnCode))completionHandler;
 
 @end

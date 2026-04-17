@@ -96,17 +96,6 @@
                                     </connections>
                                 </menu>
                             </menuItem>
-                            <menuItem isSeparatorItem="YES" id="m54-Is-iLE"/>
-                            <menuItem title="Open Sync URL..." keyEquivalent="O" id="iTJ-09-gX5">
-                                <connections>
-                                    <action selector="openSyncURL:" target="PLw-ns-0qo" id="bt7-BD-wFI"/>
-                                </connections>
-                            </menuItem>
-                            <menuItem title="Connect to Object Server…" keyEquivalent="k" id="u5P-s1-qhf">
-                                <connections>
-                                    <action selector="connectToSyncServer:" target="PLw-ns-0qo" id="6MJ-bq-efe"/>
-                                </connections>
-                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="9zf-QU-MRX"/>
                             <menuItem title="Close" keyEquivalent="w" id="DVo-aG-piG">
                                 <connections>
@@ -152,25 +141,6 @@
                                 </menu>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="H9W-ez-O6J"/>
-                            <menuItem title="Import From" id="Oxm-sa-Vwc">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" title="Import From" id="bDd-8m-aT5">
-                                    <items>
-                                        <menuItem title="CSV..." id="xX6-Jo-Xnr">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="importFileFromCSV:" target="PLw-ns-0qo" id="K9H-ZF-cLu"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="XLSX..." id="rzP-vT-bQx">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="importFileFromXLSX:" target="PLw-ns-0qo" id="JkU-oL-OKa"/>
-                                            </connections>
-                                        </menuItem>
-                                    </items>
-                                </menu>
-                            </menuItem>
                             <menuItem title="Export To" id="yWr-qU-lWA">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="Export To" id="KHC-xM-yfH">
@@ -179,12 +149,6 @@
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="exportToCompactedRealm:" target="-1" id="Bqf-SJ-Zgf"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="CSV..." id="r4f-YM-16u">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="exportToCSV:" target="-1" id="iMl-yy-kcK"/>
                                             </connections>
                                         </menuItem>
                                     </items>
@@ -312,13 +276,6 @@ CA
                                     <action selector="performZoom:" target="-1" id="DIl-cC-cCs"/>
                                 </connections>
                             </menuItem>
-                            <menuItem isSeparatorItem="YES" id="AN0-IA-yWy"/>
-                            <menuItem title="Welcome to Realm Browser" id="du5-RL-cMe">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <connections>
-                                    <action selector="showWelcomeWindow:" target="PLw-ns-0qo" id="Hcm-oE-HvR"/>
-                                </connections>
-                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="eu3-7i-yIM"/>
                             <menuItem title="Bring All to Front" id="LE2-aR-0XJ">
                                 <modifierMask key="keyEquivalentModifierMask"/>
@@ -336,12 +293,6 @@ CA
                             <menuItem title="Realm Browser Help" keyEquivalent="?" id="FKE-Sm-Kum">
                                 <connections>
                                     <action selector="showHelp:" target="-1" id="y7X-2Q-9no"/>
-                                </connections>
-                            </menuItem>
-                            <menuItem title="Visit Realm Studio Website" id="pv3-Ik-bUn">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <connections>
-                                    <action selector="visitRealmStudioSite:" target="PLw-ns-0qo" id="BoC-G4-nUt"/>
                                 </connections>
                             </menuItem>
                         </items>

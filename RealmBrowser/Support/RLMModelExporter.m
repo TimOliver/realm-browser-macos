@@ -394,6 +394,12 @@
             return [NSString stringWithFormat:@"%@ *", property.objectClassName];
         case RLMPropertyTypeLinkingObjects:
             return @"RLMLinkingObjects *";
+        case RLMPropertyTypeObjectId:
+            return @"RLMObjectId *";
+        case RLMPropertyTypeDecimal128:
+            return @"RLMDecimal128 *";
+        case RLMPropertyTypeUUID:
+            return @"NSUUID *";
     }
 }
 

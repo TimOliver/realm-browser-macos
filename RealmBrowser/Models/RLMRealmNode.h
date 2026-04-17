@@ -32,7 +32,6 @@
 
 - (instancetype)initWithConfiguration:(RLMRealmConfiguration *)configuration;
 - (instancetype)initWithFileURL:(NSURL *)fileURL;
-- (instancetype)initWithSyncURL:(NSURL *)syncURL user:(RLMSyncUser *)user;
 
 - (BOOL)connect:(NSError **)error;
 
