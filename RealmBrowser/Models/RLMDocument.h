@@ -24,8 +24,6 @@
 typedef NS_ENUM(NSInteger, RLMDocumentState) {
     RLMDocumentStateRequiresFormatUpgrade,
     RLMDocumentStateNeedsEncryptionKey,
-    RLMDocumentStateNeedsValidCredentials,
-    RLMDocumentStateLoading,
     RLMDocumentStateLoaded,
     RLMDocumentStateUnrecoverableError
 };
@@ -35,16 +33,11 @@ typedef NS_ENUM(NSInteger, RLMDocumentState) {
 @property (nonatomic, assign) RLMDocumentState state;
 @property (nonatomic, strong) IBOutlet RLMRealmNode *presentedRealm;
 
-@property (nonatomic, copy, readonly) NSURL *syncURL;
-@property (nonatomic, copy, readonly) NSURL *authServerURL;
-@property (nonatomic, strong, readonly) RLMSyncCredentials *credentials;
 @property (nonatomic, strong, readonly) NSError *error;
 
 - (instancetype)initWithContentsOfFileURL:(NSURL *)fileURL error:(NSError **)outError;
-- (instancetype)initWithContentsOfSyncURL:(NSURL *)syncURL credentials:(RLMSyncCredentials *)credentials authServerURL:(NSURL *)authServerURL error:(NSError **)outError;
 
 - (BOOL)loadByPerformingFormatUpgradeWithError:(NSError * __autoreleasing *)error;
 - (BOOL)loadWithEncryptionKey:(NSData *)key error:(NSError * __autoreleasing *)error;
-- (void)loadWithCredentials:(RLMSyncCredentials *)credentials completionHandler:(void (^)(NSError *error))completionHandler;
 
 @end

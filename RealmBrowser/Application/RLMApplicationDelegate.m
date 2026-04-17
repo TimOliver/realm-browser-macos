@@ -22,7 +22,6 @@
 @import AppSandboxFileAccess;
 
 #import "RLMApplicationDelegate.h"
-#import "RLMApplicationDelegate+CrashReporting.h"
 
 #import "RLMBrowserConstants.h"
 #import "RLMDocumentController.h"
@@ -30,12 +29,6 @@
 #import "RLMTestDataGenerator.h"
 #import "RLMUtils.h"
 #import "TestClasses.h"
-
-#import "RLMWelcomeWindowController.h"
-#import "RLMOpenSyncURLWindowController.h"
-#import "RLMConnectToServerWindowController.h"
-#import "RLMSyncServerBrowserWindowController.h"
-#import "RLMSyncUtils.h"
 
 @interface RLMApplicationDelegate ()
 
@@ -51,38 +44,18 @@
 @property (nonatomic, strong) NSMetadataQuery *projQuery;
 @property (nonatomic, strong) NSArray *groupedFileItems;
 
-@property (nonatomic, strong) NSMutableArray *auxiliaryWindowControllers;
-
 @end
 
 @implementation RLMApplicationDelegate
 
-- (void)handleGetURLEvent:(NSAppleEventDescriptor *)event withReplyEvent:(NSAppleEventDescriptor *)replyEvent {
-    NSString* urlString = [event paramDescriptorForKeyword:keyDirectObject].stringValue;
-
-    NSURL *realmURL = [NSURL URLWithString:urlString];
-
-    [self openSyncURL:realmURL credentials:nil authServerURL:nil];
-}
-
 - (void)applicationWillFinishLaunching:(NSNotification *)notification {
     // Will set sharedController
     [RLMDocumentController new];
-
-    [[NSAppleEventManager sharedAppleEventManager] setEventHandler:self andSelector:@selector(handleGetURLEvent:withReplyEvent:) forEventClass:kInternetEventClass andEventID:kAEGetURL];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
-    [self setupCrashReporting];
-
     [[NSUserDefaults standardUserDefaults] setObject:@(kTopTipDelay) forKey:@"NSInitialToolTipDelay"];
     [[NSUserDefaults standardUserDefaults] synchronize];
-
-    [self logOutSyncUsers];
-
-    [RLMSyncManager sharedManager].errorHandler = ^(NSError *error, RLMSyncSession *session) {
-        [NSApp presentError:error];
-    };
 
     self.realmQuery = [[NSMetadataQuery alloc] init];
     [self.realmQuery setSortDescriptors:@[[[NSSortDescriptor alloc] initWithKey:(id)kMDItemContentModificationDate ascending:NO]]];
@@ -90,7 +63,7 @@
     self.realmQuery.predicate = realmPredicate;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(realmQueryNote:) name:nil object:self.realmQuery];
     [self.realmQuery startQuery];
-    
+
     self.appQuery = [[NSMetadataQuery alloc] init];
     NSPredicate *appPredicate = [NSPredicate predicateWithFormat:@"kMDItemFSName like[c] '*.app'"];
     self.appQuery.predicate = appPredicate;
@@ -104,14 +77,6 @@
     self.dateFormatter = [[NSDateFormatter alloc] init];
     self.dateFormatter.dateStyle = NSDateFormatterMediumStyle;
     self.dateFormatter.timeStyle = NSDateFormatterShortStyle;
-
-    if ([notification.userInfo[NSApplicationLaunchIsDefaultLaunchKey] boolValue] && ![[NSProcessInfo processInfo] environment][@"TESTING"]) {
-        [self showWelcomeWindow:nil];
-    }
-}
-
-- (void)applicationWillTerminate:(NSNotification *)notification {
-    [self logOutSyncUsers];
 }
 
 - (BOOL)application:(NSApplication *)application openFile:(NSString *)filename {
@@ -124,14 +89,14 @@
 {
     if (filenames.count > kMaxNumberOfFilesAtOnce) {
         NSString *message = [NSString stringWithFormat:@"Are you sure you wish to open all %lu Realm files?", (unsigned long)filenames.count];
-        
+
         NSAlert *alert = [[NSAlert alloc] init];
         [alert setMessageText:message];
         [alert setInformativeText:@"Opening too many files at once may result in Realm Browser becoming unstable."];
         [alert addButtonWithTitle:@"Yes"];
         [alert addButtonWithTitle:@"Cancel"];
-        [alert setAlertStyle:NSWarningAlertStyle];
-        
+        [alert setAlertStyle:NSAlertStyleWarning];
+
         if ([alert runModal] != NSAlertFirstButtonReturn)
             return;
     }
@@ -142,15 +107,6 @@
 
 - (BOOL)applicationShouldOpenUntitledFile:(NSApplication *)application
 {
-    return NO;
-}
-
-- (BOOL)applicationShouldHandleReopen:(NSApplication *)application hasVisibleWindows:(BOOL)flag
-{
-    if (!flag) {
-        [self showWelcomeWindow:nil];
-    }
-
     return NO;
 }
 
@@ -165,38 +121,6 @@
     userInfo[NSLocalizedRecoverySuggestionErrorKey] = underlyingError.userInfo[NSLocalizedDescriptionKey];
 
     return [NSError errorWithDomain:error.domain code:error.code userInfo:userInfo];
-}
-
-#pragma mark - Welcome Window
-
-- (IBAction)showWelcomeWindow:(id)sender {
-    static BOOL toutDisplayedDuringAppRun = NO;
-    static NSString *toutSuppressionKey = @"RealmStudio_suppress_tout";
-    RLMWelcomeWindowController *welcomeWindowController = [[RLMWelcomeWindowController alloc] init];
-
-    [welcomeWindowController.window center];
-    [welcomeWindowController showWindow:nil completionHandler:^(NSModalResponse returnCode) {
-        [self removeAuxiliaryWindowController:welcomeWindowController];
-    }];
-
-    [self addAuxiliaryWindowController:welcomeWindowController];
-    if (!toutDisplayedDuringAppRun && ![[NSUserDefaults standardUserDefaults] boolForKey:toutSuppressionKey]) {
-        toutDisplayedDuringAppRun = YES;
-        NSAlert *upgradeAlert = [[NSAlert alloc] init];
-        [upgradeAlert addButtonWithTitle:@"Get Realm Studio..."];
-        [upgradeAlert addButtonWithTitle:@"Not now"];
-        [upgradeAlert setShowsSuppressionButton:YES];
-        [upgradeAlert setMessageText:@"Realm Browser is deprecated"];
-        [upgradeAlert setInformativeText:@"Realm Browser has been replaced by Realm Studio. Bug fixes and enhancements will only be available via Realm Studio going forwards."];
-        NSInteger result = [upgradeAlert runModal];
-        if (result == NSAlertFirstButtonReturn) {
-            // Open the web site.
-            [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"https://realm.io/products/realm-studio/"]];
-        }
-        if ([upgradeAlert suppressionButton].state == NSOnState) {
-            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:toutSuppressionKey];
-        }
-    }
 }
 
 #pragma mark - Event handling
@@ -235,7 +159,7 @@
 {
     NSImage *image = [NSImage imageNamed:@"RealmFileIcon"];
     image.size = NSMakeSize(kMenuImageSize, kMenuImageSize);
-    
+
     for (id item in items) {
         // Category heading, create disabled menu item with corresponding name
         if ([item isKindOfClass:[NSString class]]) {
@@ -244,13 +168,13 @@
             categoryItem.enabled = NO;
             [menu addItem:categoryItem];
         }
-        // Array of items, create cubmenu and set them up there by calling this method recursively
+        // Array of items, create submenu and set them up there by calling this method recursively
         else if ([item isKindOfClass:[NSArray class]]) {
             NSMenuItem *submenuItem = [[NSMenuItem alloc] init];
             submenuItem.title = @"More";
             submenuItem.indentationLevel = 1;
             [menu addItem:submenuItem];
-            
+
             NSMenu *submenu = [[NSMenu alloc] initWithTitle:@"More"];
             NSArray *subitems = item;
             [self updateMenu:submenu withItems:subitems indented:NO];
@@ -259,7 +183,7 @@
         // Normal file item, just create a menu item for it and wire it up
         else if ([item isMemberOfClass:[NSMetadataItem class]]) {
             NSMetadataItem *metadataItem = (NSMetadataItem *)item;
-            
+
             // Get the path to the realm and see if there is additional info for it, such as app name
             NSString *path = [metadataItem valueForAttribute:NSMetadataItemPathKey];
             NSString *title = [[path lastPathComponent] stringByAppendingString:[self extraInfoForRealmWithPath:path]];
@@ -268,17 +192,17 @@
             NSMenuItem *menuItem = [[NSMenuItem alloc] init];
             menuItem.title = title;
             menuItem.representedObject = [NSURL fileURLWithPath:path];
-            
+
             menuItem.target = self;
             menuItem.action = @selector(openFileWithMenuItem:);
             menuItem.image = image;
             menuItem.indentationLevel = indented ? 1 : 0;
-            
+
             // Give the menu item a tooltip with modification date and full path
             NSDate *date = [metadataItem valueForAttribute:NSMetadataItemFSContentChangeDateKey];
             NSString *dateString = [self.dateFormatter stringFromDate:date];
             menuItem.toolTip = [NSString stringWithFormat:@"%@\n\nModified: %@", path, dateString];
-            
+
             [menu addItem:menuItem];
         }
     }
@@ -288,10 +212,10 @@
 {
     NSArray *searchPaths;
     NSString *searchEndPath;
-    
+
     NSString *developerPrefix = [NSHomeDirectory() stringByAppendingPathComponent:kDeveloperFolder];
     NSString *simulatorPrefix = [NSHomeDirectory() stringByAppendingPathComponent:kSimulatorFolder];
-    
+
     if ([realmPath hasPrefix:developerPrefix]) {
         // The realm file is in the simulator, so we are looking for *.xcodeproj files
         searchPaths = [self.projQuery results];
@@ -306,7 +230,7 @@
         // We have no extra info for this containing folder
         return @"";
     }
-    
+
     // Search at most four levels up for a corresponding app/project file
     for (NSUInteger i = 0; i < 4; i++) {
         // Go up one level in the file hierachy by deleting last path component
@@ -315,11 +239,11 @@
             // Reached end of iteration, the respective folder we are searching within
             return @"";
         }
-        
+
         for (NSString *pathItem in searchPaths) {
             NSMetadataItem *metadataItem = (NSMetadataItem *)pathItem;
             NSString *foundPath = [metadataItem valueForAttribute:NSMetadataItemPathKey];
-            
+
             if ([[foundPath stringByDeletingLastPathComponent] isEqualToString:realmPath]) {
                 // Found a project/app file, returning it in formatted form
                 NSString *extraInfo = [[[foundPath pathComponents] lastObject] stringByDeletingPathExtension];
@@ -327,7 +251,7 @@
             }
         }
     }
-    
+
     // Tried four levels up and still found nothing, nor reached containing folder. Giving up
     return @"";
 }
@@ -335,31 +259,31 @@
 -(void)updateFileItems
 {
     NSString *homeDir = RLMRealHomeDirectory();
-    
+
     NSString *kPrefix = @"Prefix";
     NSString *kItems = @"Items";
-    
+
     NSString *simPrefix = [homeDir stringByAppendingPathComponent:kSimulatorFolder];
     NSDictionary *simDict = @{kPrefix : simPrefix, kItems : [NSMutableArray arrayWithObject:@"iPhone Simulator"]};
-    
+
     NSString *devPrefix = [homeDir stringByAppendingPathComponent:kDeveloperFolder];
     NSDictionary *devDict = @{kPrefix : devPrefix, kItems : [NSMutableArray arrayWithObject:@"Developer"]};
-    
+
     NSString *desktopPrefix = [homeDir stringByAppendingPathComponent:kDesktopFolder];
     NSDictionary *desktopDict = @{kPrefix : desktopPrefix, kItems : [NSMutableArray arrayWithObject:@"Desktop"]};
-    
+
     NSString *downloadPrefix = [homeDir stringByAppendingPathComponent:kDownloadFolder];
     NSDictionary *downloadDict = @{kPrefix : downloadPrefix, kItems : [NSMutableArray arrayWithObject:@"Download"]};
-    
+
     NSString *documentsPrefix = [homeDir stringByAppendingPathComponent:kDocumentsFolder];
     NSDictionary *documentsdDict = @{kPrefix : documentsPrefix, kItems : [NSMutableArray arrayWithObject:@"Documents"]};
-    
+
     NSString *allPrefix = @"/";
     NSDictionary *otherDict = @{kPrefix : allPrefix, kItems : [NSMutableArray arrayWithObject:@"Other"]};
-    
+
     // Create array of dictionaries, each corresponding to search folders
     NSArray *tempGroupedFileItems = @[simDict, devDict, desktopDict, documentsdDict, downloadDict, otherDict];
-    
+
     // Iterate through all search results
     for (NSMetadataItem *fileItem in self.realmQuery.results) {
         // Iterate through the different prefixes and add item to corresponding array within dictionary
@@ -385,7 +309,7 @@
             }
         }
     }
-    
+
     // Do not include empty groups
     self.groupedFileItems = [tempGroupedFileItems filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"%K.@count > 1", kItems]];
 }
@@ -396,50 +320,50 @@
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSArray *directories = [fileManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask];
     NSURL *url = [directories firstObject];
-    
+
     // Prompt the user for location af new realm file.
     [self showSavePanelStringFromDirectory:url completionHandler:^(BOOL userSelectedFile, NSURL *selectedFile) {
-        
+
         NSURL *directoryURL = [selectedFile URLByDeletingLastPathComponent];
-        
+
         AppSandboxFileAccess *fileAccess = [AppSandboxFileAccess fileAccess];
         [fileAccess requestAccessPermissionsForFileURL:directoryURL persistPermission:YES withBlock:^(NSURL *securelyScopedURL, NSData *bookmarkData) {
             [securelyScopedURL startAccessingSecurityScopedResource];
-            
+
             // If the user has selected a file url for storing the demo database, we first check if the
             // file already exists (and is actually a file) we delete the old file before creating the
             // new demo file.
             if (userSelectedFile) {
                 NSString *path = selectedFile.path;
                 BOOL isDirectory = NO;
-                
+
                 if ([fileManager fileExistsAtPath:path isDirectory:&isDirectory]) {
                     if (!isDirectory) {
                         NSError *error;
                         [fileManager removeItemAtURL:selectedFile error:&error];
                     }
                 }
-                
+
                 NSArray *classNames = @[[RealmTestClass0 className], [RealmTestClass1 className], [RealmTestClass2 className]];
                 BOOL success = [RLMTestDataGenerator createRealmAtUrl:selectedFile withClassesNamed:classNames objectCount:1000];
-                
+
                 if (success) {
                     NSAlert *alert = [[NSAlert alloc] init];
-                    
-                    alert.alertStyle = NSInformationalAlertStyle;
+
+                    alert.alertStyle = NSAlertStyleInformational;
                     alert.showsHelp = NO;
                     alert.informativeText = @"A demo database has been generated. Would you like to open it?";
                     alert.messageText = @"Open demo database?";
                     [alert addButtonWithTitle:@"Open"];
                     [alert addButtonWithTitle:@"Cancel"];
-                    
+
                     NSUInteger response = [alert runModal];
                     if (response == NSAlertFirstButtonReturn) {
                         [self openFileAtURL:selectedFile];
                     }
                 }
             }
-            
+
             //As realm files perform some file-system level cleanup during their dealloc phase,
             //make sure the sandbox access is removed in the next run loop to give it some time to finish.
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -462,12 +386,12 @@
     openPanel.allowedFileTypes = @[@"xlsx"];
 
     NSInteger result = [openPanel runModal];
-    if (result != NSFileHandlingPanelOKButton) {
+    if (result != NSModalResponseOK) {
         return;
     }
-    
+
     NSURL *targetFileURL = openPanel.URL;
-    
+
     // Get the destination folder to save the Realm file
     NSOpenPanel *savePanel = [NSOpenPanel openPanel];
     savePanel.canChooseDirectories = YES;
@@ -475,43 +399,47 @@
     savePanel.canCreateDirectories = YES;
     savePanel.allowsMultipleSelection = NO;
     savePanel.message = @"Please choose the destination folder for the new Realm file.";
-    
+
     result = [savePanel runModal];
-    if (result != NSFileHandlingPanelOKButton) {
+    if (result != NSModalResponseOK) {
         return;
     }
-    
+
     NSURL *targetDirectoryURL = savePanel.URL;
     NSString *realmFilePath = [targetDirectoryURL.path stringByAppendingPathComponent:@"default.realm"];
-    
+
     if ([[NSFileManager defaultManager] fileExistsAtPath:realmFilePath]) {
-        NSAlert *alert = [NSAlert alertWithMessageText:@"A Realm file named \"default.realm\" already exists in that location. Do you wish to proceed?"
-                                         defaultButton:@"Cancel"
-                                       alternateButton:@"OK"
-                                           otherButton:nil
-                             informativeTextWithFormat:@"The existing file will be deleted and replaced with a new one. This operation cannot be undone."];
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = @"A Realm file named \"default.realm\" already exists in that location. Do you wish to proceed?";
+        alert.informativeText = @"The existing file will be deleted and replaced with a new one. This operation cannot be undone.";
+        [alert addButtonWithTitle:@"Cancel"];
+        [alert addButtonWithTitle:@"OK"];
+
         NSInteger result = [alert runModal];
-        if (result > 0) {
+        if (result == NSAlertFirstButtonReturn) {
             return;
         }
-    
+
         [[NSFileManager defaultManager] removeItemAtPath:realmFilePath error:nil];
     }
-    
+
     AppSandboxFileAccess *fileAccess = [AppSandboxFileAccess fileAccess];
     [fileAccess requestAccessPermissionsForFileURL:targetDirectoryURL persistPermission:YES withBlock:^(NSURL *securelyScopedURL, NSData *bookmarkData) {
         [securelyScopedURL startAccessingSecurityScopedResource];
-    
+
         @autoreleasepool {
             RLMImportSchemaGenerator *schemaGenerator = [[RLMImportSchemaGenerator alloc] initWithFile:targetFileURL.path encoding:EncodingUtf8];
             RLMImportSchema *schema = [schemaGenerator generatedSchemaWithError:nil];
-            
+
             if (schema == nil) {
-                NSAlert *alert = [NSAlert alertWithMessageText:@"Unable to Generate Schema" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"Please check the file is in the correct format and try again."];
+                NSAlert *alert = [[NSAlert alloc] init];
+                alert.messageText = @"Unable to Generate Schema";
+                alert.informativeText = @"Please check the file is in the correct format and try again.";
+                [alert addButtonWithTitle:@"OK"];
                 [alert runModal];
                 return;
             }
-            
+
             RLMXLSXDataImporter *importer = [[RLMXLSXDataImporter alloc] initWithFile:targetFileURL.path encoding:EncodingUtf8];
 
             NSError *error;
@@ -519,7 +447,7 @@
                 [NSApp presentError:error];
             }
         }
-        
+
         [securelyScopedURL stopAccessingSecurityScopedResource];
     }];
 }
@@ -533,66 +461,69 @@
     openPanel.allowsMultipleSelection = YES;
     openPanel.message   = @"Please choose the CSV files you wish to import.";
     openPanel.allowedFileTypes = @[@"csv"];
-    
+
     NSInteger result = [openPanel runModal];
-    if (result != NSFileHandlingPanelOKButton) {
+    if (result != NSModalResponseOK) {
         return;
     }
-    
+
     NSArray *fileURLs = openPanel.URLs;
     NSMutableArray *filePaths = [NSMutableArray array];
     for (NSURL *url in fileURLs) {
         [filePaths addObject:url.path];
     }
-    
+
     NSOpenPanel *savePanel = [NSOpenPanel openPanel];
     savePanel.canChooseDirectories = YES;
     savePanel.canChooseFiles = NO;
     savePanel.canCreateDirectories = YES;
     savePanel.allowsMultipleSelection = NO;
     savePanel.message = @"Please choose the destination folder for the new Realm file.";
-    
+
     result = [savePanel runModal];
-    if (result != NSFileHandlingPanelOKButton) {
+    if (result != NSModalResponseOK) {
         return;
     }
-    
+
     NSURL *targetDirectoryURL = savePanel.URL;
     NSString *realmFilePath = [targetDirectoryURL.path stringByAppendingPathComponent:@"default.realm"];
-    
+
     if ([[NSFileManager defaultManager] fileExistsAtPath:realmFilePath]) {
-        NSAlert *alert = [NSAlert alertWithMessageText:@"A Realm file named \"default.realm\" already exists in that location. Do you wish to proceed?"
-                                         defaultButton:@"Cancel"
-                                       alternateButton:@"OK"
-                                           otherButton:nil
-                             informativeTextWithFormat:@"The existing file will be deleted and replaced with a new one. This operation cannot be undone."];
-        
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = @"A Realm file named \"default.realm\" already exists in that location. Do you wish to proceed?";
+        alert.informativeText = @"The existing file will be deleted and replaced with a new one. This operation cannot be undone.";
+        [alert addButtonWithTitle:@"Cancel"];
+        [alert addButtonWithTitle:@"OK"];
+
         NSInteger result = [alert runModal];
-        if (result > 0) {
+        if (result == NSAlertFirstButtonReturn) {
             return;
         }
-        
+
         [[NSFileManager defaultManager] removeItemAtPath:realmFilePath error:nil];
     }
-    
+
     AppSandboxFileAccess *fileAccess = [AppSandboxFileAccess fileAccess];
     [fileAccess requestAccessPermissionsForFileURL:targetDirectoryURL persistPermission:YES withBlock:^(NSURL *securelyScopedURL, NSData *bookmarkData) {
         [securelyScopedURL startAccessingSecurityScopedResource];
-    
+
         @autoreleasepool {
             RLMImportSchemaGenerator *schemaGenerator = [[RLMImportSchemaGenerator alloc] initWithFiles:filePaths encoding:EncodingUtf8];
             RLMImportSchema *schema = [schemaGenerator generatedSchemaWithError:nil];
-            
+
             if (schema == nil) {
-                NSAlert *alert = [NSAlert alertWithMessageText:@"Unable to Generate Schema" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"Please check the files are in the correct format and try again."];
+                NSAlert *alert = [[NSAlert alloc] init];
+                alert.messageText = @"Unable to Generate Schema";
+                alert.informativeText = @"Please check the files are in the correct format and try again.";
+                [alert addButtonWithTitle:@"OK"];
                 [alert runModal];
                 return;
             }
-            
+
             RLMCSVDataImporter *importer = [[RLMCSVDataImporter alloc] initWithFiles:filePaths encoding:EncodingUtf8];
             [importer importToPath:targetDirectoryURL.path withSchema:schema error:nil];
         }
-        
+
         [securelyScopedURL stopAccessingSecurityScopedResource];
     }];
 }
@@ -613,37 +544,29 @@
     }];
 }
 
-- (void)openSyncURL:(NSURL *)syncURL credentials:(RLMSyncCredentials *)credentials authServerURL:(NSURL *)authServerURL {
-    [(RLMDocumentController *)[NSDocumentController sharedDocumentController] openDocumentWithContentsOfSyncURL:syncURL credentials:credentials authServerURL:authServerURL display:YES completionHandler:^(NSDocument *document, BOOL documentWasAlreadyOpen, NSError *error) {
-        if (error != nil) {
-            [NSApp presentError:error];
-        }
-    }];
-}
-
 - (void)showSavePanelStringFromDirectory:(NSURL *)directoryUrl completionHandler:(void(^)(BOOL userSelectesFile, NSURL *selectedFile))completion
 {
     NSSavePanel *savePanel = [NSSavePanel savePanel];
-    
+
     // Restrict the file type to whatever you like
     savePanel.allowedFileTypes = @[kRealmFileExtension];
-    
+
     // Set the starting directory
     savePanel.directoryURL = directoryUrl;
-    
+
     // And show another dialog headline than "Save"
     savePanel.title = @"Generate";
     savePanel.prompt = @"Generate";
-    
+
     // Perform other setup
     // Use a completion handler -- this is a block which takes one argument
     // which corresponds to the button that was clicked
     [savePanel beginWithCompletionHandler:^(NSInteger result){
-        if (result == NSFileHandlingPanelOKButton) {
-            
+        if (result == NSModalResponseOK) {
+
             // Close panel before handling errors
             [savePanel orderOut:self];
-            
+
             // Notify caller about the file selected
             completion(YES, savePanel.URL);
         }
@@ -653,115 +576,4 @@
     }];
 }
 
-#pragma mark - Auxiliary Windows Management
-
-- (void)addAuxiliaryWindowController:(NSWindowController *)windowController {
-    if (self.auxiliaryWindowControllers == nil) {
-        self.auxiliaryWindowControllers = [NSMutableArray new];
-    }
-
-    [self.auxiliaryWindowControllers addObject:windowController];
-}
-
-- (void)removeAuxiliaryWindowController:(NSWindowController *)windowController {
-    [self.auxiliaryWindowControllers removeObject:windowController];
-}
-
-- (__kindof NSWindowController *)auxiliaryWindowControllerOfClass:(Class)windowControllerClass {
-    for (NSWindowController *windowController in self.auxiliaryWindowControllers) {
-        if ([windowController isKindOfClass:windowControllerClass]) {
-
-            return windowController;
-        }
-    }
-
-    return nil;
-}
-
-#pragma mark - Sync
-
-- (IBAction)openSyncURL:(id)sender {
-    RLMOpenSyncURLWindowController *openSyncURLWindowController = [self auxiliaryWindowControllerOfClass:[RLMOpenSyncURLWindowController class]];
-
-    if (openSyncURLWindowController != nil) {
-        [openSyncURLWindowController.window makeKeyAndOrderFront:sender];
-        return;
-    }
-
-    openSyncURLWindowController = [[RLMOpenSyncURLWindowController alloc] init];
-
-    [openSyncURLWindowController showWindow:sender completionHandler:^(NSModalResponse returnCode) {
-        if (returnCode == NSModalResponseOK) {
-            [self openSyncURL:openSyncURLWindowController.url credentials:openSyncURLWindowController.credentials authServerURL:nil];
-        }
-
-        [self removeAuxiliaryWindowController:openSyncURLWindowController];
-    }];
-
-    [self addAuxiliaryWindowController:openSyncURLWindowController];
-}
-
-- (IBAction)connectToSyncServer:(id)sender {
-    RLMConnectToServerWindowController *connectToServerWindowController = [self auxiliaryWindowControllerOfClass:[RLMConnectToServerWindowController class]];
-
-    if (connectToServerWindowController != nil) {
-        [connectToServerWindowController.window makeKeyAndOrderFront:sender];
-        return;
-    }
-
-    connectToServerWindowController = [[RLMConnectToServerWindowController alloc] init];
-
-    [connectToServerWindowController showWindow:sender completionHandler:^(NSModalResponse returnCode) {
-        if (returnCode == NSModalResponseOK) {
-            NSURL *serverURL = connectToServerWindowController.serverURL;
-            RLMSyncCredentials *credentials = connectToServerWindowController.credentials;
-
-            [self connectToServerAtURL:serverURL withAdminCredentials:credentials];
-        }
-
-        [self removeAuxiliaryWindowController:connectToServerWindowController];
-    }];
-
-    [self addAuxiliaryWindowController:connectToServerWindowController];
-}
-
-- (void)connectToServerAtURL:(NSURL *)serverURL withAdminCredentials:(RLMSyncCredentials *)credentials {
-    NSURL *authServerURL = authServerURLForSyncURL(serverURL);
-
-    [RLMSyncUser logInWithCredentials:credentials authServerURL:authServerURL onCompletion:^(RLMSyncUser *user, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (user == nil) {
-                [NSApp presentError:error];
-                [self connectToSyncServer:nil];
-            } else {
-                RLMSyncServerBrowserWindowController *browserWindowController = [[RLMSyncServerBrowserWindowController alloc] initWithServerURL:serverURL user:user];
-
-                browserWindowController.onSelectURL = ^(NSURL *url) {
-                    [self openSyncURL:url credentials:credentials authServerURL:authServerURL];
-                };
-
-                [browserWindowController showWindow:nil completionHandler:^(NSModalResponse returnCode) {
-                    [self removeAuxiliaryWindowController:browserWindowController];
-                }];
-
-                [self addAuxiliaryWindowController:browserWindowController];
-            }
-        });
-    }];
-}
-
-- (void)logOutSyncUsers {
-    // Log out all the logged in users to cleanup chached realms
-    [[RLMSyncUser allUsers] enumerateKeysAndObjectsUsingBlock:^(NSString *key, RLMSyncUser *user, BOOL *stop) {
-        [user logOut];
-    }];
-}
-
-#pragma mark - Other
-
-- (IBAction)visitRealmStudioSite:(NSMenuItem *)sender {
-    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"https://realm.io/products/realm-studio/"]];
-}
-
 @end
-

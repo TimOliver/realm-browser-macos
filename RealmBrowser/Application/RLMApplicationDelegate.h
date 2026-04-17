@@ -20,7 +20,4 @@
 
 @interface RLMApplicationDelegate : NSObject <NSApplicationDelegate>
 
-- (IBAction)openSyncURL:(id)sender;
-- (IBAction)connectToSyncServer:(id)sender;
-
 @end

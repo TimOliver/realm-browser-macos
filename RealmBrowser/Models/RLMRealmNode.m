@@ -53,15 +53,6 @@
     return self;
 }
 
-- (instancetype)initWithSyncURL:(NSURL *)syncURL user:(RLMSyncUser *)user {
-    RLMRealmConfiguration *configuration = [[RLMRealmConfiguration alloc] init];
-    configuration.dynamic = YES;
-    configuration.syncConfiguration = [[RLMSyncConfiguration alloc] initWithUser:user realmURL:syncURL];
-    configuration.syncConfiguration.enableSSLValidation = NO;
-
-    return [self initWithConfiguration:configuration];
-}
-
 - (BOOL)connect:(NSError **)error {
     self.configuration.encryptionKey = self.encryptionKey;
     self.configuration.disableFormatUpgrade = self.disableFormatUpgrade;
