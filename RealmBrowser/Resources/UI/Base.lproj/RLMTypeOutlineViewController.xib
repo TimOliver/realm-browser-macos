@@ -23,7 +23,7 @@
                         <rect key="frame" x="0.0" y="0.0" width="236" height="400"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <outlineView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" selectionHighlightStyle="sourceList" multipleSelection="NO" autosaveColumns="NO" rowHeight="24" viewBased="YES" outlineTableColumn="ye8-fR-LJ8" id="IMi-6Y-gQF">
+                            <outlineView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" selectionHighlightStyle="sourceList" multipleSelection="NO" autosaveColumns="NO" rowHeight="24" indentationPerLevel="0" viewBased="YES" outlineTableColumn="ye8-fR-LJ8" id="IMi-6Y-gQF">
                                 <rect key="frame" x="0.0" y="0.0" width="236" height="400"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <size key="intercellSpacing" width="3" height="0.0"/>
@@ -68,8 +68,12 @@
                                                 <rect key="frame" x="11" y="22" width="233" height="22"/>
                                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                                                 <subviews>
+                                                    <imageView horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="sym-iv-cls">
+                                                        <rect key="frame" x="4" y="3" width="16" height="16"/>
+                                                        <imageCell key="cell" refusesFirstResponder="YES" alignment="left" imageScaling="proportionallyDown" id="sym-ic-cls"/>
+                                                    </imageView>
                                                     <textField focusRingType="none" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="EaJ-q6-IlG">
-                                                        <rect key="frame" x="18" y="3" width="171" height="16"/>
+                                                        <rect key="frame" x="24" y="3" width="165" height="16"/>
                                                         <textFieldCell key="cell" lineBreakMode="truncatingTail" sendsActionOnEndEditing="YES" alignment="left" title="Row label" id="A0k-QZ-8eL">
                                                             <font key="font" metaFont="system"/>
                                                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
@@ -85,14 +89,19 @@
                                                     </button>
                                                 </subviews>
                                                 <constraints>
+                                                    <constraint firstItem="sym-iv-cls" firstAttribute="leading" secondItem="O58-xq-8no" secondAttribute="leading" constant="8" id="sym-ct-led"/>
+                                                    <constraint firstItem="sym-iv-cls" firstAttribute="centerY" secondItem="O58-xq-8no" secondAttribute="centerY" id="sym-ct-cty"/>
+                                                    <constraint firstItem="sym-iv-cls" firstAttribute="width" constant="16" id="sym-ct-wid"/>
+                                                    <constraint firstItem="sym-iv-cls" firstAttribute="height" constant="16" id="sym-ct-hgt"/>
+                                                    <constraint firstItem="EaJ-q6-IlG" firstAttribute="leading" secondItem="sym-iv-cls" secondAttribute="trailing" constant="6" id="fkb-ge-NET"/>
+                                                    <constraint firstItem="EaJ-q6-IlG" firstAttribute="centerY" secondItem="O58-xq-8no" secondAttribute="centerY" id="UfS-ho-zJk"/>
                                                     <constraint firstItem="I1l-Wv-wMz" firstAttribute="leading" secondItem="EaJ-q6-IlG" secondAttribute="trailing" constant="8" symbolic="YES" id="D5m-MW-YqC"/>
                                                     <constraint firstAttribute="trailing" secondItem="I1l-Wv-wMz" secondAttribute="trailing" id="S2j-K1-n7V"/>
-                                                    <constraint firstItem="EaJ-q6-IlG" firstAttribute="centerY" secondItem="O58-xq-8no" secondAttribute="centerY" id="UfS-ho-zJk"/>
-                                                    <constraint firstItem="EaJ-q6-IlG" firstAttribute="leading" secondItem="O58-xq-8no" secondAttribute="leading" constant="20" symbolic="YES" id="fkb-ge-NET"/>
                                                     <constraint firstItem="I1l-Wv-wMz" firstAttribute="centerY" secondItem="EaJ-q6-IlG" secondAttribute="centerY" id="oq8-FO-4hn"/>
                                                 </constraints>
                                                 <connections>
                                                     <outlet property="button" destination="I1l-Wv-wMz" id="bbO-A1-Jhu"/>
+                                                    <outlet property="imageView" destination="sym-iv-cls" id="sym-cn-out"/>
                                                     <outlet property="textField" destination="EaJ-q6-IlG" id="Mfb-av-BRv"/>
                                                 </connections>
                                             </customView>
