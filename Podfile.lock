@@ -1,22 +1,18 @@
 PODS:
-  - AppSandboxFileAccess (1.0.14)
   - Realm (20.0.4):
     - Realm/Headers (= 20.0.4)
   - Realm/Headers (20.0.4)
 
 DEPENDENCIES:
-  - AppSandboxFileAccess
   - Realm
 
 SPEC REPOS:
   trunk:
-    - AppSandboxFileAccess
     - Realm
 
 SPEC CHECKSUMS:
-  AppSandboxFileAccess: f3e10b0ba10bbaa6dc6996639ff47836050329c5
   Realm: 1fca83c42ac1d5c7767974882c8de5a7abca4d89
 
-PODFILE CHECKSUM: ec0d79e0cedc1a72b8e1025744d2e2edafbdec86
+PODFILE CHECKSUM: efa88a048d613f8d18c6d7446a03f48c5dbb49eb
 
 COCOAPODS: 1.16.2

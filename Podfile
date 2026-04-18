@@ -4,7 +4,6 @@ platform :osx, '11.0'
 use_frameworks!
 
 target 'RealmBrowser' do
-    pod 'AppSandboxFileAccess'
     pod 'Realm'
 
     target 'RealmBrowserTests' do

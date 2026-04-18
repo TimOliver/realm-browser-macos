@@ -18,7 +18,6 @@
 
 @import Realm;
 @import Realm.Private;
-@import AppSandboxFileAccess;
 
 #import "RLMApplicationDelegate.h"
 
@@ -322,53 +321,35 @@
 
     // Prompt the user for location af new realm file.
     [self showSavePanelStringFromDirectory:url completionHandler:^(BOOL userSelectedFile, NSURL *selectedFile) {
+        if (!userSelectedFile) {
+            return;
+        }
 
-        NSURL *directoryURL = [selectedFile URLByDeletingLastPathComponent];
+        NSString *path = selectedFile.path;
+        BOOL isDirectory = NO;
+        if ([fileManager fileExistsAtPath:path isDirectory:&isDirectory] && !isDirectory) {
+            NSError *error;
+            [fileManager removeItemAtURL:selectedFile error:&error];
+        }
 
-        AppSandboxFileAccess *fileAccess = [AppSandboxFileAccess fileAccess];
-        [fileAccess requestAccessPermissionsForFileURL:directoryURL persistPermission:YES withBlock:^(NSURL *securelyScopedURL, NSData *bookmarkData) {
-            [securelyScopedURL startAccessingSecurityScopedResource];
+        NSArray *classNames = @[[RealmTestClass0 className], [RealmTestClass1 className], [RealmTestClass2 className]];
+        BOOL success = [RLMTestDataGenerator createRealmAtUrl:selectedFile withClassesNamed:classNames objectCount:1000];
 
-            // If the user has selected a file url for storing the demo database, we first check if the
-            // file already exists (and is actually a file) we delete the old file before creating the
-            // new demo file.
-            if (userSelectedFile) {
-                NSString *path = selectedFile.path;
-                BOOL isDirectory = NO;
+        if (success) {
+            NSAlert *alert = [[NSAlert alloc] init];
 
-                if ([fileManager fileExistsAtPath:path isDirectory:&isDirectory]) {
-                    if (!isDirectory) {
-                        NSError *error;
-                        [fileManager removeItemAtURL:selectedFile error:&error];
-                    }
-                }
+            alert.alertStyle = NSAlertStyleInformational;
+            alert.showsHelp = NO;
+            alert.informativeText = @"A demo database has been generated. Would you like to open it?";
+            alert.messageText = @"Open demo database?";
+            [alert addButtonWithTitle:@"Open"];
+            [alert addButtonWithTitle:@"Cancel"];
 
-                NSArray *classNames = @[[RealmTestClass0 className], [RealmTestClass1 className], [RealmTestClass2 className]];
-                BOOL success = [RLMTestDataGenerator createRealmAtUrl:selectedFile withClassesNamed:classNames objectCount:1000];
-
-                if (success) {
-                    NSAlert *alert = [[NSAlert alloc] init];
-
-                    alert.alertStyle = NSAlertStyleInformational;
-                    alert.showsHelp = NO;
-                    alert.informativeText = @"A demo database has been generated. Would you like to open it?";
-                    alert.messageText = @"Open demo database?";
-                    [alert addButtonWithTitle:@"Open"];
-                    [alert addButtonWithTitle:@"Cancel"];
-
-                    NSUInteger response = [alert runModal];
-                    if (response == NSAlertFirstButtonReturn) {
-                        [self openFileAtURL:selectedFile];
-                    }
-                }
+            NSUInteger response = [alert runModal];
+            if (response == NSAlertFirstButtonReturn) {
+                [self openFileAtURL:selectedFile];
             }
-
-            //As realm files perform some file-system level cleanup during their dealloc phase,
-            //make sure the sandbox access is removed in the next run loop to give it some time to finish.
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [securelyScopedURL stopAccessingSecurityScopedResource];
-            });
-        }];
+        }
     }];
 }
 
