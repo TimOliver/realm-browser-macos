@@ -97,13 +97,6 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
     self = [super initWithWindow:window];
     if (self) {
-        NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"RLMRealmBrowserToolbar"];
-        toolbar.delegate = self;
-        toolbar.allowsUserCustomization = YES;
-        toolbar.autosavesConfiguration = YES;
-        toolbar.displayMode = NSToolbarDisplayModeIconOnly;
-        window.toolbar = toolbar;
-
         navigationStack = [[RLMNavigationStack alloc] init];
 
         // Build the pane view controllers and install the split view controller up-front,
@@ -115,6 +108,13 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
         self.tableViewController = [[RLMInstanceTableViewController alloc] init];
         self.tableViewController.parentWindowController = self;
         [self installSplitViewController];
+
+        NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"RLMRealmBrowserToolbar"];
+        toolbar.delegate = self;
+        toolbar.allowsUserCustomization = YES;
+        toolbar.autosavesConfiguration = YES;
+        toolbar.displayMode = NSToolbarDisplayModeIconOnly;
+        window.toolbar = toolbar;
 
         // Modify responder chain to handle shortcuts for table view (workaround for https://github.com/realm/realm-browser-osx/issues/241)
         self.outlineViewController.tableView.enclosingScrollView.nextResponder = self.tableViewController.tableView;
@@ -172,6 +172,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     item.view = segmented;
     item.label = @"Navigation";
     item.paletteLabel = @"Navigation";
+    item.navigational = YES;
 
     self.navigationButtons = segmented;
     return item;
@@ -238,6 +239,9 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     }
     if ([itemIdentifier isEqualToString:kLockItemIdentifier]) {
         return [self makeLockToolbarItem];
+    }
+    if ([itemIdentifier isEqualToString:NSToolbarSidebarTrackingSeparatorItemIdentifier]) {
+        return [NSTrackingSeparatorToolbarItem trackingSeparatorToolbarItemWithIdentifier:itemIdentifier splitView:self.splitView dividerIndex:0];
     }
     return nil;
 }
