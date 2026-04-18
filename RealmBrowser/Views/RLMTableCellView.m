@@ -82,7 +82,7 @@
 - (void)setBackgroundStyle:(NSBackgroundStyle)backgroundStyle
 {
     [super setBackgroundStyle:backgroundStyle];
-    [self configurePlaceholderStringHighlighted:(backgroundStyle == NSBackgroundStyleDark)];
+    [self configurePlaceholderStringHighlighted:(backgroundStyle == NSBackgroundStyleEmphasized)];
 }
 
 - (void)configurePlaceholderStringHighlighted:(BOOL)highlighted
@@ -92,12 +92,12 @@
     }
 
     if (self.highlightedPlaceholderString == nil || self.defaultPlaceholderString == nil) {
-        NSDictionary *highlightedAttributes = @{NSForegroundColorAttributeName:[NSColor colorWithRed:1.0f green:1.0f blue:1.0f alpha:1.0f]};
+        NSDictionary *highlightedAttributes = @{NSForegroundColorAttributeName:[NSColor alternateSelectedControlTextColor]};
         self.highlightedPlaceholderString = [[NSAttributedString alloc] initWithString:@"nil" attributes:highlightedAttributes];
-        
-        NSDictionary *defaultAttributes = @{NSForegroundColorAttributeName:[NSColor colorWithRGBAFloatValues:(CGFloat *)kNilItemColor]};
+
+        NSDictionary *defaultAttributes = @{NSForegroundColorAttributeName:[NSColor placeholderTextColor]};
         self.defaultPlaceholderString = [[NSAttributedString alloc] initWithString:@"nil" attributes:defaultAttributes];
-        
+
     }
     
     [[NSOperationQueue mainQueue] addOperationWithBlock:^{

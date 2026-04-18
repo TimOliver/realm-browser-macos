@@ -19,8 +19,8 @@
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
-        <window title="Realm" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" restorable="NO" releasedWhenClosed="NO" visibleAtLaunch="NO" appearanceType="aqua" animationBehavior="default" id="xOd-HO-29H" userLabel="Window">
-            <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES" texturedBackground="YES" unifiedTitleAndToolbar="YES"/>
+        <window title="Realm" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" restorable="NO" releasedWhenClosed="NO" visibleAtLaunch="NO" animationBehavior="default" id="xOd-HO-29H" userLabel="Window">
+            <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
             <windowCollectionBehavior key="collectionBehavior" fullScreenPrimary="YES"/>
             <rect key="contentRect" x="247" y="192" width="977" height="476"/>
             <rect key="screenRect" x="0.0" y="0.0" width="1280" height="800"/>
@@ -36,7 +36,7 @@
                                 <rect key="frame" x="0.0" y="0.0" width="236" height="476"/>
                                 <autoresizingMask key="autoresizingMask"/>
                                 <subviews>
-                                    <scrollView appearanceType="aqua" borderType="none" autohidesScrollers="YES" horizontalLineScroll="24" horizontalPageScroll="10" verticalLineScroll="24" verticalPageScroll="10" usesPredominantAxisScrolling="NO" translatesAutoresizingMaskIntoConstraints="NO" id="MSf-82-x0U" userLabel="OutlineScroll">
+                                    <scrollView borderType="none" autohidesScrollers="YES" horizontalLineScroll="24" horizontalPageScroll="10" verticalLineScroll="24" verticalPageScroll="10" usesPredominantAxisScrolling="NO" translatesAutoresizingMaskIntoConstraints="NO" id="MSf-82-x0U" userLabel="OutlineScroll">
                                         <rect key="frame" x="0.0" y="0.0" width="236" height="476"/>
                                         <clipView key="contentView" focusRingType="none" drawsBackground="NO" id="udQ-xx-2L4">
                                             <rect key="frame" x="0.0" y="0.0" width="236" height="476"/>
@@ -212,7 +212,7 @@
                         <segmentedControl key="view" verticalHuggingPriority="750" id="2Ep-Z1-kHF">
                             <rect key="frame" x="0.0" y="14" width="67" height="28"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                            <segmentedCell key="cell" borderStyle="border" alignment="left" style="texturedSquare" trackingMode="momentary" id="8pQ-he-SG1">
+                            <segmentedCell key="cell" borderStyle="border" alignment="left" style="rounded" trackingMode="momentary" id="8pQ-he-SG1">
                                 <font key="font" metaFont="system"/>
                                 <segments>
                                     <segment image="NSLeftFacingTriangleTemplate" width="32"/>
