@@ -33,7 +33,6 @@ NSString * const kRealmLockedTooltip = @"Unlock to enable editing";
 NSString * const kRealmUnlockedTooltip = @"Lock to prevent editing";
 NSString * const kRealmKeyIsLockedForRealm = @"LockedRealm:%@";
 
-static NSToolbarItemIdentifier const kDocumentTitleItemIdentifier = @"DocumentTitleItem";
 static NSToolbarItemIdentifier const kNavigationItemIdentifier = @"Navigation";
 static NSToolbarItemIdentifier const kSearchItemIdentifier = @"Search";
 static NSToolbarItemIdentifier const kLockItemIdentifier = @"RealmLockItem";
@@ -52,10 +51,6 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 @property (nonatomic, strong) RLMEncryptionKeyWindowController *encryptionController;
 
 @property (nonatomic, strong) RLMNotificationToken *documentNotificationToken;
-
-@property (nonatomic, strong) NSToolbarItem *documentTitleToolbarItem;
-@property (nonatomic, weak) NSTextField *documentTitleLabel;
-@property (nonatomic, weak) NSTextField *documentSubtitleLabel;
 
 @end
 
@@ -95,7 +90,6 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     NSWindow *window = [[NSWindow alloc] initWithContentRect:contentRect styleMask:mask backing:NSBackingStoreBuffered defer:NO];
     window.minSize = NSMakeSize(440, 200);
     window.releasedWhenClosed = NO;
-    window.titleVisibility = NSWindowTitleHidden;
     window.titlebarAppearsTransparent = YES;
     window.toolbarStyle = NSWindowToolbarStyleUnified;
     window.collectionBehavior |= NSWindowCollectionBehaviorFullScreenPrimary;
@@ -104,7 +98,8 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     if (self) {
         NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"RLMRealmBrowserToolbar"];
         toolbar.delegate = self;
-        toolbar.autosavesConfiguration = NO;
+        toolbar.allowsUserCustomization = YES;
+        toolbar.autosavesConfiguration = YES;
         toolbar.displayMode = NSToolbarDisplayModeIconOnly;
         window.toolbar = toolbar;
     }
@@ -169,41 +164,6 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     [self.splitView setAutosaveName:[NSString stringWithFormat:kRealmKeyOutlineWidthForRealm, realmPath]];
 }
 
-- (void)buildDocumentTitleToolbarItem
-{
-    NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 220, 38)];
-
-    NSTextField *titleLabel = [NSTextField labelWithString:self.window.title ?: @""];
-    titleLabel.font = [NSFont systemFontOfSize:13 weight:NSFontWeightSemibold];
-    titleLabel.textColor = NSColor.labelColor;
-    titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    titleLabel.alignment = NSTextAlignmentCenter;
-    titleLabel.frame = NSMakeRect(0, 18, 220, 18);
-    titleLabel.autoresizingMask = NSViewWidthSizable;
-    [container addSubview:titleLabel];
-    [titleLabel bind:NSValueBinding toObject:self.window withKeyPath:NSStringFromSelector(@selector(title)) options:nil];
-
-    NSTextField *subtitleLabel = [NSTextField labelWithString:self.window.subtitle ?: @""];
-    subtitleLabel.font = [NSFont systemFontOfSize:11];
-    subtitleLabel.textColor = NSColor.secondaryLabelColor;
-    subtitleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    subtitleLabel.alignment = NSTextAlignmentCenter;
-    subtitleLabel.frame = NSMakeRect(0, 2, 220, 14);
-    subtitleLabel.autoresizingMask = NSViewWidthSizable;
-    [container addSubview:subtitleLabel];
-    [subtitleLabel bind:NSValueBinding toObject:self.window withKeyPath:NSStringFromSelector(@selector(subtitle)) options:nil];
-
-    NSToolbarItem *item = [[NSToolbarItem alloc] initWithItemIdentifier:kDocumentTitleItemIdentifier];
-    item.view = container;
-    item.minSize = NSMakeSize(160, 38);
-    item.maxSize = NSMakeSize(400, 38);
-    item.visibilityPriority = NSToolbarItemVisibilityPriorityHigh;
-
-    self.documentTitleLabel = titleLabel;
-    self.documentSubtitleLabel = subtitleLabel;
-    self.documentTitleToolbarItem = item;
-}
-
 - (NSToolbarItem *)makeNavigationToolbarItem
 {
     NSSegmentedControl *segmented = [NSSegmentedControl segmentedControlWithImages:@[
@@ -255,8 +215,8 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar
 {
-    return @[kNavigationItemIdentifier,
-             kDocumentTitleItemIdentifier,
+    return @[NSToolbarToggleSidebarItemIdentifier,
+             kNavigationItemIdentifier,
              kSearchItemIdentifier,
              kLockItemIdentifier,
              NSToolbarFlexibleSpaceItemIdentifier,
@@ -265,11 +225,11 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar
 {
-    return @[NSToolbarFlexibleSpaceItemIdentifier,
+    return @[NSToolbarToggleSidebarItemIdentifier,
+             NSToolbarFlexibleSpaceItemIdentifier,
              kLockItemIdentifier,
              NSToolbarSidebarTrackingSeparatorItemIdentifier,
              kNavigationItemIdentifier,
-             kDocumentTitleItemIdentifier,
              NSToolbarFlexibleSpaceItemIdentifier,
              kSearchItemIdentifier];
 }
@@ -284,12 +244,6 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     }
     if ([itemIdentifier isEqualToString:kLockItemIdentifier]) {
         return [self makeLockToolbarItem];
-    }
-    if ([itemIdentifier isEqualToString:kDocumentTitleItemIdentifier]) {
-        if (!self.documentTitleToolbarItem) {
-            [self buildDocumentTitleToolbarItem];
-        }
-        return self.documentTitleToolbarItem;
     }
     return nil;
 }
@@ -591,9 +545,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 - (void)updateWindowSubtitle
 {
-    NSString *subtitle = navigationStack.currentState.selectedType.name ?: @"";
-    self.window.subtitle = subtitle;
-    self.documentSubtitleLabel.hidden = (subtitle.length == 0);
+    self.window.subtitle = navigationStack.currentState.selectedType.name ?: @"";
 }
 
 - (void)newWindowWithNavigationState:(RLMNavigationState *)state
