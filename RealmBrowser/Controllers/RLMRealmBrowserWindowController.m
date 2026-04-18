@@ -90,6 +90,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     NSWindow *window = [[NSWindow alloc] initWithContentRect:contentRect styleMask:mask backing:NSBackingStoreBuffered defer:NO];
     window.minSize = NSMakeSize(440, 200);
     window.releasedWhenClosed = NO;
+    window.restorable = NO;
     window.titlebarAppearsTransparent = YES;
     window.toolbarStyle = NSWindowToolbarStyleUnified;
     window.collectionBehavior |= NSWindowCollectionBehaviorFullScreenPrimary;
@@ -102,6 +103,21 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
         toolbar.autosavesConfiguration = YES;
         toolbar.displayMode = NSToolbarDisplayModeIconOnly;
         window.toolbar = toolbar;
+
+        navigationStack = [[RLMNavigationStack alloc] init];
+
+        // Build the pane view controllers and install the split view controller up-front,
+        // before the window is shown. Restoring the window to its saved frame with a missing
+        // contentViewController leaves an empty placeholder chrome, so we make sure the
+        // real content is in place before any show path runs.
+        self.outlineViewController = [[RLMTypeOutlineViewController alloc] init];
+        self.outlineViewController.parentWindowController = self;
+        self.tableViewController = [[RLMInstanceTableViewController alloc] init];
+        self.tableViewController.parentWindowController = self;
+        [self installSplitViewController];
+
+        // Modify responder chain to handle shortcuts for table view (workaround for https://github.com/realm/realm-browser-osx/issues/241)
+        self.outlineViewController.tableView.enclosingScrollView.nextResponder = self.tableViewController.tableView;
     }
     return self;
 }
@@ -112,46 +128,28 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 }
 
 // NSWindowController.windowDidLoad doesn't fire when the window is supplied via initWithWindow:.
-// Instead we run the post-load setup from -setDocument: the first time the document is assigned.
+// This runs from -setDocument: the first time the document is assigned so we can pick up
+// document-specific configuration (autosave keys etc.) that aren't available in -init.
 - (void)performInitialWindowSetup
 {
-    navigationStack = [[RLMNavigationStack alloc] init];
-
     NSString *realmPath = self.document.fileURL.path;
-    NSString *autosaveName = [NSString stringWithFormat:kRealmKeyWindowFrameForRealm, realmPath];
-    if (![self.window setFrameUsingName:autosaveName]) {
+    NSString *windowAutosave = [NSString stringWithFormat:kRealmKeyWindowFrameForRealm, realmPath];
+    if (![self.window setFrameUsingName:windowAutosave]) {
         [self.window center];
     }
-    [self setWindowFrameAutosaveName:autosaveName];
+    [self setWindowFrameAutosaveName:windowAutosave];
 
-    // Instantiate the pane view controllers from their own XIBs and wire parent links.
-    self.outlineViewController = [[RLMTypeOutlineViewController alloc] init];
-    self.outlineViewController.parentWindowController = self;
-    self.tableViewController = [[RLMInstanceTableViewController alloc] init];
-    self.tableViewController.parentWindowController = self;
-
-    // Replace the window's contentView with a proper NSSplitViewController so the toolbar
-    // gets automatic sidebar zoning (flex space before the lock respects the sidebar width).
-    [self installSplitViewControllerForRealmPath:realmPath];
-
-    // Modify responder chain to handle shortcuts for table view (workaround for https://github.com/realm/realm-browser-osx/issues/241)
-    self.outlineViewController.tableView.enclosingScrollView.nextResponder = self.tableViewController.tableView;
+    self.splitView.autosaveName = [NSString stringWithFormat:kRealmKeyOutlineWidthForRealm, realmPath];
 }
 
-- (void)installSplitViewControllerForRealmPath:(NSString *)realmPath
+- (void)installSplitViewController
 {
-    // The outline and table VCs are loaded from the main XIB with their `view` outlets
-    // pointing at the sidebar's visual-effect container and the content pane, respectively.
-    // Detach them from the XIB's plain split view so we can hand them to NSSplitViewItem.
-    [self.outlineViewController.view removeFromSuperview];
-    [self.tableViewController.view removeFromSuperview];
-
     NSSplitViewController *splitVC = [[NSSplitViewController alloc] init];
 
     NSSplitViewItem *sidebarItem = [NSSplitViewItem sidebarWithViewController:self.outlineViewController];
     sidebarItem.minimumThickness = 225;
     sidebarItem.maximumThickness = 400;
-    sidebarItem.canCollapse = YES;
+    sidebarItem.canCollapse = NO;
     [splitVC addSplitViewItem:sidebarItem];
 
     NSSplitViewItem *contentItem = [NSSplitViewItem splitViewItemWithViewController:self.tableViewController];
@@ -160,8 +158,6 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
     self.window.contentViewController = splitVC;
     self.splitView = splitVC.splitView;
-
-    [self.splitView setAutosaveName:[NSString stringWithFormat:kRealmKeyOutlineWidthForRealm, realmPath]];
 }
 
 - (NSToolbarItem *)makeNavigationToolbarItem
@@ -215,8 +211,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar
 {
-    return @[NSToolbarToggleSidebarItemIdentifier,
-             kNavigationItemIdentifier,
+    return @[kNavigationItemIdentifier,
              kSearchItemIdentifier,
              kLockItemIdentifier,
              NSToolbarFlexibleSpaceItemIdentifier,
@@ -225,8 +220,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar
 {
-    return @[NSToolbarToggleSidebarItemIdentifier,
-             NSToolbarFlexibleSpaceItemIdentifier,
+    return @[NSToolbarFlexibleSpaceItemIdentifier,
              kLockItemIdentifier,
              NSToolbarSidebarTrackingSeparatorItemIdentifier,
              kNavigationItemIdentifier,

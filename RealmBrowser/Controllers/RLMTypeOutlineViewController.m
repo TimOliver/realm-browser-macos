@@ -97,16 +97,16 @@
 
 - (NSInteger)outlineView:(NSOutlineView *)outlineView numberOfChildrenOfItem:(id)item
 {
-    // There is never more than one root node
+    // The root yields the single presented realm — but only once the document is attached.
     if (item == nil) {
-        return 1;
+        return self.parentWindowController.document.presentedRealm ? 1 : 0;
     }
     // ... otherwise the number of child nodes are defined by the node in question.
     else if ([item conformsToProtocol:@protocol(RLMRealmOutlineNode)]) {
         id<RLMRealmOutlineNode> outlineItem = item;
         return outlineItem.numberOfChildNodes;
     }
-    
+
     return 0;
 }
 
