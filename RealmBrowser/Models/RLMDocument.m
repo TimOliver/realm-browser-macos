@@ -147,7 +147,7 @@
 
 - (NSString *)displayName
 {
-    return self.fileURL.lastPathComponent.stringByDeletingPathExtension;
+    return self.fileURL.lastPathComponent;
 }
 
 @end
