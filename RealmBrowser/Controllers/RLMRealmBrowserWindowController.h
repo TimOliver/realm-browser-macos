@@ -30,8 +30,8 @@ extern const NSUInteger kMaxNumberOfArrayEntriesInToolTip;
 
 @property (atomic, assign) RLMDocument *document;
 
-@property (nonatomic, strong) IBOutlet RLMTypeOutlineViewController *outlineViewController;
-@property (nonatomic, strong) IBOutlet RLMInstanceTableViewController *tableViewController;
+@property (nonatomic, strong) RLMTypeOutlineViewController *outlineViewController;
+@property (nonatomic, strong) RLMInstanceTableViewController *tableViewController;
 
 - (void)addNavigationState:(RLMNavigationState *)state fromViewController:(RLMViewController *)controller;
 

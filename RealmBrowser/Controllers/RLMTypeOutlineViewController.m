@@ -35,6 +35,11 @@
 
 @implementation RLMTypeOutlineViewController
 
+- (instancetype)init
+{
+    return [super initWithNibName:NSStringFromClass(self.class) bundle:nil];
+}
+
 #pragma mark - RLMViewController overrides
 
 -(void)realmDidLoad
@@ -217,11 +222,7 @@
 
 - (NSOutlineView *)outlineView
 {
-    if ([self.view isKindOfClass:[NSOutlineView class]]) {
-        return (NSOutlineView *)self.view;
-    }
-    
-    return nil;
+    return self.classesOutlineView;
 }
 
 #pragma mark - Private methods

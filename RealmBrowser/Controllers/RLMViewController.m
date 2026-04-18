@@ -39,10 +39,20 @@
 
 - (NSTableView *)tableView
 {
-    if ([self.view isKindOfClass:[NSTableView class]]) {
-        return (NSTableView *)self.view;
+    return [self tableViewInView:self.view];
+}
+
+- (NSTableView *)tableViewInView:(NSView *)view
+{
+    if ([view isKindOfClass:[NSTableView class]]) {
+        return (NSTableView *)view;
     }
-        
+    for (NSView *subview in view.subviews) {
+        NSTableView *found = [self tableViewInView:subview];
+        if (found) {
+            return found;
+        }
+    }
     return nil;
 }
 
