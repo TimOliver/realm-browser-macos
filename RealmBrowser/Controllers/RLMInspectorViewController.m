@@ -30,6 +30,8 @@ static const CGFloat kHorizontalInset = 16.0;
 
 @interface RLMInspectorViewController () <NSTextFieldDelegate>
 
+@property (nonatomic, strong) NSStackView *headerStack;
+@property (nonatomic, strong) NSBox *headerSeparator;
 @property (nonatomic, strong) NSTextField *headerTitleLabel;
 @property (nonatomic, strong) NSTextField *headerSubtitleLabel;
 @property (nonatomic, strong) NSStackView *fieldsStack;
@@ -90,15 +92,24 @@ static const CGFloat kHorizontalInset = 16.0;
     self.headerSubtitleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     self.headerSubtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
-    NSStackView *headerStack = [NSStackView stackViewWithViews:@[self.headerTitleLabel, self.headerSubtitleLabel]];
-    headerStack.orientation = NSUserInterfaceLayoutOrientationVertical;
-    headerStack.alignment = NSLayoutAttributeLeading;
-    headerStack.spacing = 2;
-    headerStack.translatesAutoresizingMaskIntoConstraints = NO;
+    NSStackView *titleStack = [NSStackView stackViewWithViews:@[self.headerTitleLabel, self.headerSubtitleLabel]];
+    titleStack.orientation = NSUserInterfaceLayoutOrientationVertical;
+    titleStack.alignment = NSLayoutAttributeLeading;
+    titleStack.spacing = 2;
+    titleStack.edgeInsets = NSEdgeInsetsMake(12, kHorizontalInset, 12, kHorizontalInset);
+    titleStack.translatesAutoresizingMaskIntoConstraints = NO;
 
-    NSBox *headerSeparator = [[NSBox alloc] init];
-    headerSeparator.boxType = NSBoxSeparator;
-    headerSeparator.translatesAutoresizingMaskIntoConstraints = NO;
+    self.headerSeparator = [[NSBox alloc] init];
+    self.headerSeparator.boxType = NSBoxSeparator;
+    self.headerSeparator.translatesAutoresizingMaskIntoConstraints = NO;
+
+    // Outer stack collapses when its arranged subviews are hidden, letting the scroll view rise to the top.
+    self.headerStack = [NSStackView stackViewWithViews:@[titleStack, self.headerSeparator]];
+    self.headerStack.orientation = NSUserInterfaceLayoutOrientationVertical;
+    self.headerStack.alignment = NSLayoutAttributeLeading;
+    self.headerStack.distribution = NSStackViewDistributionFill;
+    self.headerStack.spacing = 0;
+    self.headerStack.translatesAutoresizingMaskIntoConstraints = NO;
 
     // Empty state label shown when no row is selected.
     self.emptyStateLabel = [NSTextField labelWithString:@"No Selection"];
@@ -107,23 +118,20 @@ static const CGFloat kHorizontalInset = 16.0;
     self.emptyStateLabel.alignment = NSTextAlignmentCenter;
     self.emptyStateLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
-    [container addSubview:headerStack];
-    [container addSubview:headerSeparator];
+    [container addSubview:self.headerStack];
     [container addSubview:self.scrollView];
     [container addSubview:self.emptyStateLabel];
 
     [NSLayoutConstraint activateConstraints:@[
-        // Header sits at the top of the panel
-        [headerStack.topAnchor constraintEqualToAnchor:container.topAnchor constant:12],
-        [headerStack.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:kHorizontalInset],
-        [headerStack.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-kHorizontalInset],
+        // Header pinned to top, full width.
+        [self.headerStack.topAnchor constraintEqualToAnchor:container.topAnchor],
+        [self.headerStack.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
+        [self.headerStack.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
+        [self.headerSeparator.leadingAnchor constraintEqualToAnchor:self.headerStack.leadingAnchor],
+        [self.headerSeparator.trailingAnchor constraintEqualToAnchor:self.headerStack.trailingAnchor],
 
-        [headerSeparator.topAnchor constraintEqualToAnchor:headerStack.bottomAnchor constant:12],
-        [headerSeparator.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
-        [headerSeparator.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
-
-        // Scroll view fills the remainder under the header separator
-        [self.scrollView.topAnchor constraintEqualToAnchor:headerSeparator.bottomAnchor],
+        // Scroll view starts right below the header stack (which collapses to 0 when hidden).
+        [self.scrollView.topAnchor constraintEqualToAnchor:self.headerStack.bottomAnchor],
         [self.scrollView.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
         [self.scrollView.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
         [self.scrollView.bottomAnchor constraintEqualToAnchor:container.bottomAnchor],
@@ -210,10 +218,26 @@ static const CGFloat kHorizontalInset = 16.0;
 - (nullable NSView *)rowForProperty:(RLMProperty *)property value:(id)value isPrimaryKey:(BOOL)isPrimaryKey
 {
     NSString *labelText = isPrimaryKey ? [property.name stringByAppendingString:@"  (Primary Key)"] : property.name;
-    NSTextField *label = [NSTextField labelWithString:labelText];
-    label.font = [NSFont systemFontOfSize:11 weight:NSFontWeightMedium];
-    label.textColor = NSColor.secondaryLabelColor;
-    label.translatesAutoresizingMaskIntoConstraints = NO;
+    NSTextField *nameLabel = [NSTextField labelWithString:labelText];
+    nameLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightMedium];
+    nameLabel.textColor = NSColor.secondaryLabelColor;
+    nameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    NSTextField *typeLabel = [NSTextField labelWithString:[self uppercaseTypeNameForProperty:property]];
+    typeLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightMedium];
+    typeLabel.textColor = NSColor.tertiaryLabelColor;
+    typeLabel.alignment = NSTextAlignmentRight;
+    typeLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [typeLabel setContentHuggingPriority:NSLayoutPriorityDefaultHigh forOrientation:NSLayoutConstraintOrientationHorizontal];
+    [typeLabel setContentCompressionResistancePriority:NSLayoutPriorityRequired forOrientation:NSLayoutConstraintOrientationHorizontal];
+
+    NSStackView *labelRow = [NSStackView stackViewWithViews:@[nameLabel, typeLabel]];
+    labelRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+    labelRow.distribution = NSStackViewDistributionFill;
+    labelRow.alignment = NSLayoutAttributeFirstBaseline;
+    labelRow.spacing = 8;
+    labelRow.translatesAutoresizingMaskIntoConstraints = NO;
 
     NSView *editor = [self editorForProperty:property value:value isPrimaryKey:isPrimaryKey];
     editor.translatesAutoresizingMaskIntoConstraints = NO;
@@ -223,13 +247,37 @@ static const CGFloat kHorizontalInset = 16.0;
     row.alignment = NSLayoutAttributeLeading;
     row.spacing = 4;
     row.translatesAutoresizingMaskIntoConstraints = NO;
-    [row addArrangedSubview:label];
+    [row addArrangedSubview:labelRow];
     [row addArrangedSubview:editor];
 
-    [label.widthAnchor constraintEqualToAnchor:row.widthAnchor].active = YES;
+    [labelRow.widthAnchor constraintEqualToAnchor:row.widthAnchor].active = YES;
     [editor.widthAnchor constraintEqualToAnchor:row.widthAnchor].active = YES;
 
     return row;
+}
+
+- (NSString *)uppercaseTypeNameForProperty:(RLMProperty *)property
+{
+    NSString *base = nil;
+    switch (property.type) {
+        case RLMPropertyTypeBool:           base = @"Bool"; break;
+        case RLMPropertyTypeInt:            base = @"Int"; break;
+        case RLMPropertyTypeFloat:          base = @"Float"; break;
+        case RLMPropertyTypeDouble:         base = @"Double"; break;
+        case RLMPropertyTypeString:         base = @"String"; break;
+        case RLMPropertyTypeData:           base = @"Data"; break;
+        case RLMPropertyTypeDate:           base = @"Date"; break;
+        case RLMPropertyTypeAny:            base = @"Any"; break;
+        case RLMPropertyTypeObject:         base = property.objectClassName ?: @"Object"; break;
+        case RLMPropertyTypeLinkingObjects: base = property.objectClassName ?: @"LinkingObjects"; break;
+        case RLMPropertyTypeObjectId:       base = @"ObjectId"; break;
+        case RLMPropertyTypeDecimal128:     base = @"Decimal128"; break;
+        case RLMPropertyTypeUUID:           base = @"UUID"; break;
+    }
+    if (property.array) {
+        base = [NSString stringWithFormat:@"[%@]", base];
+    }
+    return base.uppercaseString;
 }
 
 - (NSView *)editorForProperty:(RLMProperty *)property value:(id)value isPrimaryKey:(BOOL)isPrimaryKey
@@ -457,6 +505,7 @@ static const CGFloat kHorizontalInset = 16.0;
     BOOL empty = (self.inspectedObject == nil || self.inspectedObject.isInvalidated);
     self.emptyStateLabel.hidden = !empty;
     self.scrollView.hidden = empty;
+    self.headerStack.hidden = empty;
 }
 
 @end

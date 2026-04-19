@@ -19,7 +19,6 @@
 #import "RLMTableView.h"
 #import "RLMTableColumn.h"
 #import "RLMArrayNode.h"
-#import "RLMTableHeaderCell.h"
 #import "RLMDescriptions.h"
 
 const NSInteger NOT_A_COLUMN = -1;
@@ -463,46 +462,46 @@ enum MenuTags {
     while (self.numberOfColumns > 0) {
         [self removeTableColumn:[self.tableColumns lastObject]];
     }
-    
-    [self reloadData];
 
-    NSRect frame = self.headerView.frame;
-    frame.size.height = 36;
-    self.headerView.frame = frame;
+    [self reloadData];
 
     [self beginUpdates];
     // If array, add extra first column with numbers
     if ([typeNode isMemberOfClass:[RLMArrayNode class]]) {
         RLMTableColumn *tableColumn = [[RLMTableColumn alloc] initWithIdentifier:@"#"];
         tableColumn.propertyType = RLMPropertyTypeInt;
-        
-        RLMTableHeaderCell *headerCell = [[RLMTableHeaderCell alloc] init];
-        headerCell.wraps = YES;
-        headerCell.firstLine = @"";
-        headerCell.secondLine = @"#";
-
-        tableColumn.headerCell = headerCell;
+        tableColumn.title = @"#";
         tableColumn.headerToolTip = @"Order of object within array";
-        
+
         [self addTableColumn:tableColumn];
     }
-    
+
     // ... and add new columns matching the structure of the new realm table.
     NSArray *propertyColumns = typeNode.propertyColumns;
 
     for (NSUInteger index = 0; index < propertyColumns.count; index++) {
         RLMClassProperty *propertyColumn = propertyColumns[index];
         RLMTableColumn *tableColumn = [[RLMTableColumn alloc] initWithIdentifier:propertyColumn.name];
-        
+
         tableColumn.propertyType = propertyColumn.type;
-        
-        RLMTableHeaderCell *headerCell = [[RLMTableHeaderCell alloc] init];
-        headerCell.wraps = YES;
-        headerCell.firstLine = propertyColumn.name;
-        headerCell.secondLine = [NSString stringWithFormat:@"%@%@", [RLMDescriptions typeNameOfProperty:propertyColumn.property], propertyColumn.isPrimaryKey ? @", Primary Key" :@""];
-        tableColumn.headerCell = headerCell;
+        tableColumn.title = propertyColumn.name;
+
+        CGFloat initialWidth = 100.0;
+        switch (propertyColumn.type) {
+            case RLMPropertyTypeString:
+                initialWidth = 128.0;
+                break;
+            case RLMPropertyTypeInt:
+            case RLMPropertyTypeFloat:
+            case RLMPropertyTypeDouble:
+                initialWidth = 64.0;
+                break;
+            default:
+                break;
+        }
         tableColumn.minWidth = 26.0;
-        
+        tableColumn.width = initialWidth;
+
         tableColumn.headerToolTip = [self.realmDataSource headerToolTipForColumn:propertyColumn];
         [self addTableColumn:tableColumn];
     }

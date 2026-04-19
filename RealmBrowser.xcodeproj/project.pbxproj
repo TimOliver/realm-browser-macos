@@ -14,7 +14,6 @@
 		2215F6361D0011CD005A46F7 /* RealmFileIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 2215F6351D0011CD005A46F7 /* RealmFileIcon.icns */; };
 		2234B66E1CF83F9600EAFDF0 /* RLMBrowserConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = 2234B66D1CF83F9600EAFDF0 /* RLMBrowserConstants.m */; };
 		2249D9B219A62EBD00A31104 /* RLMTableColumn.m in Sources */ = {isa = PBXBuildFile; fileRef = 2249D9B119A62EBD00A31104 /* RLMTableColumn.m */; };
-		225443F519E3E6360045996B /* RLMTableHeaderCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 225443F419E3E6360045996B /* RLMTableHeaderCell.m */; };
 		22565D6719C1BCF400C8C8EC /* RLMLinkTableCellView.m in Sources */ = {isa = PBXBuildFile; fileRef = 22565D6619C1BCF400C8C8EC /* RLMLinkTableCellView.m */; };
 		228D1F871A1CAD660028562A /* RLMResultsNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 228D1F861A1CAD660028562A /* RLMResultsNode.m */; };
 		22A55FEB19D18BA8009178BC /* RLMObjectNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 22A55FEA19D18BA8009178BC /* RLMObjectNode.m */; };
@@ -95,8 +94,6 @@
 		2234B66D1CF83F9600EAFDF0 /* RLMBrowserConstants.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMBrowserConstants.m; sourceTree = "<group>"; };
 		2249D9B019A62EBD00A31104 /* RLMTableColumn.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RLMTableColumn.h; sourceTree = "<group>"; };
 		2249D9B119A62EBD00A31104 /* RLMTableColumn.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMTableColumn.m; sourceTree = "<group>"; };
-		225443F319E3E6360045996B /* RLMTableHeaderCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RLMTableHeaderCell.h; sourceTree = "<group>"; };
-		225443F419E3E6360045996B /* RLMTableHeaderCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMTableHeaderCell.m; sourceTree = "<group>"; };
 		22565D6519C1BCF400C8C8EC /* RLMLinkTableCellView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RLMLinkTableCellView.h; sourceTree = "<group>"; };
 		22565D6619C1BCF400C8C8EC /* RLMLinkTableCellView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMLinkTableCellView.m; sourceTree = "<group>"; };
 		225786A01BD564F40012436A /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/EncryptionKeyWindow.xib; sourceTree = "<group>"; };
@@ -457,8 +454,6 @@
 				84925C66195AE9AD00EE27B1 /* RLMSidebarTableCellView.m */,
 				221322FB19954B0A00D25737 /* RLMTableCellView.h */,
 				221322FC19954B0A00D25737 /* RLMTableCellView.m */,
-				225443F319E3E6360045996B /* RLMTableHeaderCell.h */,
-				225443F419E3E6360045996B /* RLMTableHeaderCell.m */,
 				8457294B1962E3860076D4F1 /* RLMTableView.h */,
 				8457294C1962E3860076D4F1 /* RLMTableView.m */,
 			);
@@ -650,7 +645,6 @@
 				C2986A8B1D6C8257005A2CD6 /* RLMOptionalBoolTableCellView.m in Sources */,
 				8474E2BD195452BE00BCA755 /* RLMInstanceTableViewController.m in Sources */,
 				84754ABE193CA4600093604E /* RLMRealmBrowserWindowController.m in Sources */,
-				225443F519E3E6360045996B /* RLMTableHeaderCell.m in Sources */,
 				22D3AC8A19CC5D710042C1B2 /* RLMModelExporter.m in Sources */,
 				84E0F95C1921F3B900D6CA14 /* main.m in Sources */,
 				84925C61195AD5B000EE27B1 /* NSColor+ByteSizeFactory.m in Sources */,

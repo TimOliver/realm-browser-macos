@@ -80,14 +80,13 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 - (instancetype)init
 {
-    NSRect contentRect = NSMakeRect(0, 0, 1000, 700);
+    NSRect contentRect = NSMakeRect(0, 0, 1000, 660);
     NSWindowStyleMask mask = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
                               NSWindowStyleMaskResizable | NSWindowStyleMaskFullSizeContentView);
     NSWindow *window = [[NSWindow alloc] initWithContentRect:contentRect styleMask:mask backing:NSBackingStoreBuffered defer:NO];
     window.minSize = NSMakeSize(440, 200);
     window.releasedWhenClosed = NO;
     window.restorable = NO;
-    window.titlebarAppearsTransparent = YES;
     window.toolbarStyle = NSWindowToolbarStyleUnified;
     window.collectionBehavior |= NSWindowCollectionBehaviorFullScreenPrimary;
 
@@ -136,7 +135,18 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     }
     [self setWindowFrameAutosaveName:windowAutosave];
 
-    self.splitView.autosaveName = [NSString stringWithFormat:kRealmKeyOutlineWidthForRealm, realmPath];
+    NSString *dividerAutosave = [NSString stringWithFormat:kRealmKeyOutlineWidthForRealm, realmPath];
+    BOOL hadSavedDividerPositions = ([[NSUserDefaults standardUserDefaults] objectForKey:[NSString stringWithFormat:@"NSSplitView Subview Frames %@", dividerAutosave]] != nil);
+    self.splitView.autosaveName = dividerAutosave;
+
+    if (!hadSavedDividerPositions) {
+        // First launch: open the inspector at 300pt. After that, the split view
+        // autosave keeps whatever width the user left it at.
+        CGFloat totalWidth = self.splitView.bounds.size.width;
+        if (totalWidth > 0 && self.splitView.arrangedSubviews.count == 3) {
+            [self.splitView setPosition:(totalWidth - 280) ofDividerAtIndex:1];
+        }
+    }
 }
 
 - (void)installSplitViewController
@@ -146,7 +156,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     NSSplitViewItem *sidebarItem = [NSSplitViewItem sidebarWithViewController:self.outlineViewController];
     sidebarItem.minimumThickness = 225;
     sidebarItem.maximumThickness = 400;
-    sidebarItem.canCollapse = NO;
+    sidebarItem.canCollapse = YES;
     [splitVC addSplitViewItem:sidebarItem];
 
     NSSplitViewItem *contentItem = [NSSplitViewItem splitViewItemWithViewController:self.tableViewController];
@@ -214,7 +224,8 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar
 {
-    return @[kNavigationItemIdentifier,
+    return @[NSToolbarToggleSidebarItemIdentifier,
+             kNavigationItemIdentifier,
              kSearchItemIdentifier,
              kInspectorToggleItemIdentifier,
              NSToolbarFlexibleSpaceItemIdentifier,
@@ -223,7 +234,9 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 - (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar
 {
-    return @[NSToolbarSidebarTrackingSeparatorItemIdentifier,
+    return @[NSToolbarFlexibleSpaceItemIdentifier,
+             NSToolbarToggleSidebarItemIdentifier,
+             NSToolbarSidebarTrackingSeparatorItemIdentifier,
              kNavigationItemIdentifier,
              NSToolbarFlexibleSpaceItemIdentifier,
              kSearchItemIdentifier,
