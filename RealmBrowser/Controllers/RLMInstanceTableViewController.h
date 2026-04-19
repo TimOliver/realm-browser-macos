@@ -28,7 +28,6 @@
 
 @property (nonatomic, readonly) RLMTableView *realmTableView;
 
-@property (nonatomic) BOOL realmIsLocked;
 @property (nonatomic) BOOL displaysArray;
 
 @property (nonatomic, copy) void(^didSelectedBlock)(RLMObject *rowObject);

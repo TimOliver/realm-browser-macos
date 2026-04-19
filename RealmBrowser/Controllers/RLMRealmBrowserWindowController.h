@@ -39,4 +39,6 @@ extern const NSUInteger kMaxNumberOfArrayEntriesInToolTip;
 
 - (void)reloadAllWindows;
 
+- (void)inspectObject:(nullable id)object;
+
 @end

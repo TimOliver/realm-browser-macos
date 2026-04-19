@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2014-2015 Realm Inc.
+// Copyright 2026 Realm Browser Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,10 +17,15 @@
 ////////////////////////////////////////////////////////////////////////////
 
 @import Cocoa;
+@import Realm;
 
-@interface RLMTableHeaderCell : NSTableHeaderCell
+NS_ASSUME_NONNULL_BEGIN
 
-@property (nonatomic) NSString *firstLine;
-@property (nonatomic) NSString *secondLine;
+@interface RLMInspectorViewController : NSViewController
+
+/// The object whose properties are being inspected. Set to nil to clear.
+- (void)setInspectedObject:(nullable RLMObject *)object;
 
 @end
+
+NS_ASSUME_NONNULL_END

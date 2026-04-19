@@ -70,11 +70,26 @@ const CGFloat kMaxColumnWidth = 200.0;
     NSSize headerSize = [headerCell cellSizeForBounds:rect];
 
     maxWidth = MAX(maxWidth + 10.0f, headerSize.width*1.1);
-    
+
+    CGFloat initialFloor = 0.0;
+    switch (self.propertyType) {
+        case RLMPropertyTypeString:
+            initialFloor = 128.0;
+            break;
+        case RLMPropertyTypeInt:
+        case RLMPropertyTypeFloat:
+        case RLMPropertyTypeDouble:
+            initialFloor = 64.0;
+            break;
+        default:
+            break;
+    }
+    maxWidth = MAX(maxWidth, initialFloor);
+
     if (limited) {
         maxWidth = MIN(maxWidth, kMaxColumnWidth);
     }
-    
+
     return maxWidth;
 }
 

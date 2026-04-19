@@ -19,7 +19,6 @@
 #import "RLMTableView.h"
 #import "RLMTableColumn.h"
 #import "RLMArrayNode.h"
-#import "RLMTableHeaderCell.h"
 #import "RLMDescriptions.h"
 
 const NSInteger NOT_A_COLUMN = -1;
@@ -178,21 +177,12 @@ enum MenuTags {
     [self.menu removeAllItems];
     
     BOOL actualColumn = self.clickedColumn != NOT_A_COLUMN;
-    
-    // Menu items that are independent on the realm lock
+
     if (actualColumn && [self.realmDelegate containsArrayInRows:self.selectedRowIndexes column:self.clickedColumn]) {
         [self.menu addItem:openArrayInNewWindowItem];
         [self.menu addItem:insertLinkInArray];
     }
-    
-    // If it is locked, show the unlock hint menu item and return
-    if (self.realmDelegate.realmIsLocked) {
-        [self.menu addItem:clickLockItem];
-        return;
-    }
-    
-    // Below, only menu items that do require editing
-    
+
     if (self.realmDelegate.displaysArray) {
         [self.menu addItem:insertIntoArrayItem];
         [self.menu addItem:insertLinkInArray];
@@ -302,52 +292,50 @@ enum MenuTags {
 {
     BOOL nonemptySelection = self.selectedRowIndexes.count > 0;
     BOOL multipleSelection = self.selectedRowIndexes.count > 1;
-    BOOL unlocked = !self.realmDelegate.realmIsLocked;
     BOOL displaysArray = self.realmDelegate.displaysArray;
 
     NSString *numberModifier = multipleSelection ? @"s" : @"";
-    
+
     switch (menuItem.tag) {
-        case MENU_CONTEXT_CLICK_LOCK_ICON_TO_EDIT: // Context -> Click lock icon to edit
+        case MENU_CONTEXT_CLICK_LOCK_ICON_TO_EDIT: // Retired click-lock hint
             return NO;
 
         case 100: // Edit -> Delete object
         case MENU_CONTEXT_DELETE_OBJECTS: // Context -> Delete object
             menuItem.title = [NSString stringWithFormat:@"Delete object%@", numberModifier];
-            return nonemptySelection && unlocked && !displaysArray;
+            return nonemptySelection && !displaysArray;
 
         case 101: // Edit -> Add object
-//        case 201: // Context -> Add object
             menuItem.title = [NSString stringWithFormat:@"Add new object%@", numberModifier];
-            return unlocked && !displaysArray;
-            
+            return !displaysArray;
+
         case 110: // Edit -> Remove object from array
         case MENU_CONTEXT_ARRAY_REMOVE_OBJECTS: // Context -> Remove object from array
             menuItem.title = [NSString stringWithFormat:@"Remove object%@ from array", numberModifier];
-            return unlocked && nonemptySelection && displaysArray;
+            return nonemptySelection && displaysArray;
 
         case 111: // Edit -> Remove object from array and delete
         case MENU_CONTEXT_ARRAY_DELETE_OBJECTS: // Context -> Remove object from array and delete
             menuItem.title = [NSString stringWithFormat:@"Remove object%@ from array and delete", numberModifier];
-            return unlocked && nonemptySelection && displaysArray;
+            return nonemptySelection && displaysArray;
 
         case 112: // Edit -> Insert object into array
         case MENU_CONTEXT_ARRAY_ADD_NEW: // Context -> Insert object into array
             menuItem.title = [NSString stringWithFormat:@"Add new object%@ to array", numberModifier];
-            return unlocked && displaysArray;
+            return displaysArray;
 
         case 113: // Edit -> Add existing object to array
         case MENU_CONTEXT_ARRAY_ADD_EXISTING: // Context -> Add existing object to array
             menuItem.title = [NSString stringWithFormat:@"Add existing object%@ to array", numberModifier];
-            return unlocked && displaysArray;
-            
+            return displaysArray;
+
         case MENU_CONTEXT_REMOVE_BACKLINKS: // Context -> Remove links to object
             menuItem.title = [NSString stringWithFormat:@"Remove link%@ to object%@", numberModifier, numberModifier];
-            return unlocked && nonemptySelection;
+            return nonemptySelection;
 
         case MENU_CONTEXT_ARRAY_CLEAR: // Context -> Remove links to array
             menuItem.title = [NSString stringWithFormat:@"Make array%@ empty", numberModifier];
-            return unlocked && nonemptySelection;
+            return nonemptySelection;
 
         case MENU_CONTEXT_ARRAY_OPEN: // Context -> Open array in new window
             menuItem.title = @"Open array in new window";
@@ -363,7 +351,7 @@ enum MenuTags {
 // Delete selected objects
 - (IBAction)deleteObjectsAction:(id)sender
 {
-    if (!self.realmDelegate.displaysArray && !self.realmDelegate.realmIsLocked) {
+    if (!self.realmDelegate.displaysArray) {
         [self.realmDelegate deleteObjects:self.selectedRowIndexes];
     }
 }
@@ -377,7 +365,7 @@ enum MenuTags {
 // Add objects of the current type, according to number of selected rows
 - (IBAction)addObjectsAction:(id)sender
 {
-    if (!self.realmDelegate.displaysArray && !self.realmDelegate.realmIsLocked) {
+    if (!self.realmDelegate.displaysArray) {
         [self.realmDelegate addNewObjects:self.selectedRowIndexes];
     }
 }
@@ -385,7 +373,7 @@ enum MenuTags {
 // Remove selected objects from array, keeping the objects
 - (IBAction)removeRowsFromArrayAction:(id)sender
 {
-    if (self.realmDelegate.displaysArray && !self.realmDelegate.realmIsLocked) {
+    if (self.realmDelegate.displaysArray) {
         [self.realmDelegate removeRows:self.selectedRowIndexes];
     }
 }
@@ -393,7 +381,7 @@ enum MenuTags {
 // Remove selected objects from array and delete the objects
 - (IBAction)deleteRowsFromArrayAction:(id)sender
 {
-    if (self.realmDelegate.displaysArray && !self.realmDelegate.realmIsLocked) {
+    if (self.realmDelegate.displaysArray) {
         [self.realmDelegate deleteRows:self.selectedRowIndexes];
     }
 }
@@ -401,7 +389,7 @@ enum MenuTags {
 // Create and insert objects at the selected rows
 - (IBAction)addRowsToArrayAction:(id)sender
 {
-    if (self.realmDelegate.displaysArray && !self.realmDelegate.realmIsLocked) {
+    if (self.realmDelegate.displaysArray) {
         NSInteger index = self.selectedRowIndexes.count > 0 ? self.selectedRowIndexes.lastIndex + 1 : self.numberOfRows;
 
         [self.realmDelegate addNewRows:[NSIndexSet indexSetWithIndex:index]];
@@ -411,7 +399,7 @@ enum MenuTags {
 // Insert link into array
 - (IBAction)insertRowsToArrayAction:(id)sender
 {
-    if (self.realmDelegate.displaysArray && !self.realmDelegate.realmIsLocked) {
+    if (self.realmDelegate.displaysArray) {
         NSInteger index = self.selectedRowIndexes.count > 0 ? self.selectedRowIndexes.lastIndex + 1 : self.numberOfRows;
 
         [self.realmDelegate insertLinks:[NSIndexSet indexSetWithIndex:index] column:self.clickedColumn];
@@ -421,25 +409,19 @@ enum MenuTags {
 // Set object links in the clicked column to [NSNull null] at the selected rows
 - (IBAction)setObjectLinkAction:(id)sender
 {
-    if (!self.realmDelegate.realmIsLocked) {
-        [self.realmDelegate setObjectLinkAtRows:self.selectedRowIndexes column:self.clickedColumn];
-    }
+    [self.realmDelegate setObjectLinkAtRows:self.selectedRowIndexes column:self.clickedColumn];
 }
 
 // Set object links in the clicked column to [NSNull null] at the selected rows
 - (IBAction)removeObjectLinksAction:(id)sender
 {
-    if (!self.realmDelegate.realmIsLocked) {
-        [self.realmDelegate removeObjectLinksAtRows:self.selectedRowIndexes column:self.clickedColumn];
-    }
+    [self.realmDelegate removeObjectLinksAtRows:self.selectedRowIndexes column:self.clickedColumn];
 }
 
 // Make array links in the clicked column, at selected rows, empty
 - (IBAction)removeArrayLinksAction:(id)sender
 {
-    if (!self.realmDelegate.realmIsLocked) {
-        [self.realmDelegate removeArrayLinksAtRows:self.selectedRowIndexes column:self.clickedColumn];
-    }
+    [self.realmDelegate removeArrayLinksAtRows:self.selectedRowIndexes column:self.clickedColumn];
 }
 
 // Opens the array in the current cell in a new window
@@ -480,46 +462,46 @@ enum MenuTags {
     while (self.numberOfColumns > 0) {
         [self removeTableColumn:[self.tableColumns lastObject]];
     }
-    
-    [self reloadData];
 
-    NSRect frame = self.headerView.frame;
-    frame.size.height = 36;
-    self.headerView.frame = frame;
+    [self reloadData];
 
     [self beginUpdates];
     // If array, add extra first column with numbers
     if ([typeNode isMemberOfClass:[RLMArrayNode class]]) {
         RLMTableColumn *tableColumn = [[RLMTableColumn alloc] initWithIdentifier:@"#"];
         tableColumn.propertyType = RLMPropertyTypeInt;
-        
-        RLMTableHeaderCell *headerCell = [[RLMTableHeaderCell alloc] init];
-        headerCell.wraps = YES;
-        headerCell.firstLine = @"";
-        headerCell.secondLine = @"#";
-
-        tableColumn.headerCell = headerCell;
+        tableColumn.title = @"#";
         tableColumn.headerToolTip = @"Order of object within array";
-        
+
         [self addTableColumn:tableColumn];
     }
-    
+
     // ... and add new columns matching the structure of the new realm table.
     NSArray *propertyColumns = typeNode.propertyColumns;
 
     for (NSUInteger index = 0; index < propertyColumns.count; index++) {
         RLMClassProperty *propertyColumn = propertyColumns[index];
         RLMTableColumn *tableColumn = [[RLMTableColumn alloc] initWithIdentifier:propertyColumn.name];
-        
+
         tableColumn.propertyType = propertyColumn.type;
-        
-        RLMTableHeaderCell *headerCell = [[RLMTableHeaderCell alloc] init];
-        headerCell.wraps = YES;
-        headerCell.firstLine = propertyColumn.name;
-        headerCell.secondLine = [NSString stringWithFormat:@"%@%@", [RLMDescriptions typeNameOfProperty:propertyColumn.property], propertyColumn.isPrimaryKey ? @", Primary Key" :@""];
-        tableColumn.headerCell = headerCell;
+        tableColumn.title = propertyColumn.name;
+
+        CGFloat initialWidth = 100.0;
+        switch (propertyColumn.type) {
+            case RLMPropertyTypeString:
+                initialWidth = 128.0;
+                break;
+            case RLMPropertyTypeInt:
+            case RLMPropertyTypeFloat:
+            case RLMPropertyTypeDouble:
+                initialWidth = 64.0;
+                break;
+            default:
+                break;
+        }
         tableColumn.minWidth = 26.0;
-        
+        tableColumn.width = initialWidth;
+
         tableColumn.headerToolTip = [self.realmDataSource headerToolTipForColumn:propertyColumn];
         [self addTableColumn:tableColumn];
     }

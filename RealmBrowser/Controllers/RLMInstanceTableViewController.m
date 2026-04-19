@@ -142,9 +142,11 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     if ([newState isMemberOfClass:[RLMNavigationState class]]) {
         self.displayedType = newState.selectedType;
         [self.realmTableView setupColumnsWithType:newState.selectedType];
-        
+
         if (newState.selectedInstanceIndex != NSNotFound) {
             [self setSelectionIndex:newState.selectedInstanceIndex];
+        } else if (self.displayedType.instanceCount > 0) {
+            [self setSelectionIndex:0];
         }
     }
     else if ([newState isMemberOfClass:[RLMArrayNavigationState class]]) {
@@ -194,7 +196,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
 - (id<NSPasteboardWriting>)tableView:(NSTableView *)aTableView pasteboardWriterForRow:(NSInteger)row
 {
-    if (self.realmIsLocked || !self.displaysArray) {
+    if (!self.displaysArray) {
         return nil;
     }
 
@@ -217,7 +219,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
 - (BOOL)tableView:(NSTableView *)aTableView acceptDrop:(id<NSDraggingInfo>)info row:(NSInteger)destination dropOperation:(NSTableViewDropOperation)operation
 {
-    if (self.realmIsLocked || !self.displaysArray) {
+    if (!self.displaysArray) {
         return NO;
     }
 
@@ -305,9 +307,14 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     if (self.tableView == notification.object) {
         NSInteger selectedIndex = self.tableView.selectedRow;
         [self.parentWindowController.currentState updateSelectionToIndex:selectedIndex];
-        
+
+        RLMObject *selectedInstance = nil;
+        if (selectedIndex >= 0 && selectedIndex < (NSInteger)self.displayedType.instanceCount) {
+            selectedInstance = [self.displayedType instanceAtIndex:selectedIndex];
+        }
+        [self.parentWindowController inspectObject:selectedInstance];
+
         if (self.didSelectedBlock != nil) {
-            RLMObject *selectedInstance = [self.displayedType instanceAtIndex:selectedIndex];
             self.didSelectedBlock(selectedInstance);
         }
     }
@@ -374,10 +381,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                 RLMOptionalBoolTableCellView *boolCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
                 if (!boolCellView) {
                     boolCellView = [RLMOptionalBoolTableCellView viewWithIdentifier:reuseIdentifier];
-                    boolCellView.popupControl.target = self;
-                    boolCellView.popupControl.action = @selector(optionalBoolPopupChanged:);
                 }
-                
+
                 // 0 = nil, 1 = False, 2 = True
                 if (propertyValue == nil) {
                     [boolCellView.popupControl selectItemAtIndex:0];
@@ -390,6 +395,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                         [boolCellView.popupControl selectItemAtIndex:1];
                     }
                 }
+                boolCellView.popupControl.enabled = NO;
 
                 cellView = boolCellView;
             }
@@ -397,15 +403,13 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                 RLMBoolTableCellView *boolCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
                 if (!boolCellView) {
                     boolCellView = [RLMBoolTableCellView viewWithIdentifier:reuseIdentifier];
-                    boolCellView.checkBox.target = self;
-                    boolCellView.checkBox.action = @selector(editedCheckBox:);
                 }
                 boolCellView.checkBox.state = [(NSNumber *)propertyValue boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
-                [boolCellView.checkBox setEnabled:!self.realmIsLocked];
-                
+                boolCellView.checkBox.enabled = NO;
+
                 cellView = boolCellView;
             }
-            
+
             break;
         }
             // Intentional fallthrough
@@ -415,15 +419,13 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             RLMNumberTableCellView *numberCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
             if (!numberCellView) {
                 numberCellView = [RLMNumberTableCellView viewWithIdentifier:reuseIdentifier];
-                numberCellView.textField.target = self;
-                numberCellView.textField.action = @selector(editedTextField:);
             }
 
             numberCellView.textField.objectValue = propertyValue;
-            numberCellView.textField.editable = !self.realmIsLocked && !classProperty.isPrimaryKey;
+            numberCellView.textField.editable = NO;
 
             cellView = numberCellView;
-            
+
             break;
         }
 
@@ -431,14 +433,12 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             RLMLinkTableCellView *linkCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
             if (!linkCellView) {
                 linkCellView = [RLMLinkTableCellView viewWithIdentifier:reuseIdentifier];
-                linkCellView.textField.target = self;
-                linkCellView.textField.action = @selector(editedTextField:);
             }
-            
+
             NSString *string = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
             NSDictionary *attr = @{NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle)};
             linkCellView.textField.attributedStringValue = [[NSAttributedString alloc] initWithString:string attributes:attr];
-            
+
             linkCellView.textField.editable = NO;
 
             cellView = linkCellView;
@@ -457,17 +457,13 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             RLMBasicTableCellView *basicCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
             if (!basicCellView) {
                 basicCellView = [RLMBasicTableCellView viewWithIdentifier:reuseIdentifier];
-                basicCellView.textField.target = self;
-                basicCellView.textField.action = @selector(editedTextField:);
             }
 
             basicCellView.textField.stringValue = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-            basicCellView.textField.editable = !self.realmIsLocked
-                                            && property.type == RLMPropertyTypeString
-                                            && !classProperty.isPrimaryKey;
+            basicCellView.textField.editable = NO;
 
             cellView = basicCellView;
-            
+
             break;
         }
     }
@@ -968,114 +964,6 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
 #pragma mark - Public Methods - NSTableView Event Handling
 
-- (IBAction)editedTextField:(NSTextField *)sender {
-    NSInteger row = [self.tableView rowForView:sender];
-    NSInteger column = [self.tableView columnForView:sender];
-
-    RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
-    if (row < 0 || column < 0 || realm.inWriteTransaction) {
-        // Table view was reloaded during editing
-        return;
-    }
-
-    NSInteger propertyIndex = [self propertyIndexForColumn:column];
-
-    RLMTypeNode *displayedType = self.displayedType;
-    RLMClassProperty *propertyNode = displayedType.propertyColumns[propertyIndex];
-    RLMObject *selectedInstance = [displayedType instanceAtIndex:row];
-    BOOL optionalValue = propertyNode.property.optional;
-    
-    id result = nil;
-    
-    switch (propertyNode.type) {
-        case RLMPropertyTypeInt:
-            numberFormatter.allowsFloats = NO;
-            result = [numberFormatter numberFromString:sender.stringValue];
-            break;
-            
-        case RLMPropertyTypeFloat:
-        case RLMPropertyTypeDouble:
-            numberFormatter.allowsFloats = YES;
-            numberFormatter.numberStyle = NSNumberFormatterDecimalStyle;
-            result = [numberFormatter numberFromString:sender.stringValue];
-            break;
-            
-        case RLMPropertyTypeString:
-            result = sender.stringValue;
-            break;
-
-        case RLMPropertyTypeDate:
-            result = [dateFormatter dateFromString:sender.stringValue];
-            break;
-        
-        case RLMPropertyTypeLinkingObjects:
-        case RLMPropertyTypeAny:
-        case RLMPropertyTypeBool:
-        case RLMPropertyTypeData:
-        case RLMPropertyTypeObject:
-        case RLMPropertyTypeObjectId:
-        case RLMPropertyTypeDecimal128:
-        case RLMPropertyTypeUUID:
-            break;
-    }
-
-    if (result || optionalValue) {
-        NSError *error;
-
-        [realm beginWriteTransaction];
-        selectedInstance[propertyNode.name] = result;
-
-        if (![realm commitWriteTransaction:&error]) {
-            [NSApp presentError:error];
-        }
-    }
-    
-    [self.parentWindowController reloadAllWindows];
-}
-
-- (IBAction)editedCheckBox:(NSButton *)sender
-{
-    NSInteger row = [self.tableView rowForView:sender];
-    NSInteger column = [self.tableView columnForView:sender];
-    NSInteger propertyIndex = [self propertyIndexForColumn:column];
-
-    RLMTypeNode *displayedType = self.displayedType;
-    RLMClassProperty *propertyNode = displayedType.propertyColumns[propertyIndex];
-    RLMObject *selectedInstance = [displayedType instanceAtIndex:row];
-
-    NSNumber *result = @((BOOL)(sender.state == NSControlStateValueOn));
-
-    RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
-    [realm beginWriteTransaction];
-    selectedInstance[propertyNode.name] = result;
-    [realm commitWriteTransaction];
-    
-    [self.parentWindowController reloadAllWindows];
-}
-
-- (void)optionalBoolPopupChanged:(NSPopUpButton *)sender
-{
-    NSInteger row = [self.tableView rowForView:sender];
-    NSInteger column = [self.tableView columnForView:sender];
-    NSInteger propertyIndex = [self propertyIndexForColumn:column];
-    
-    RLMTypeNode *displayedType = self.displayedType;
-    RLMClassProperty *propertyNode = displayedType.propertyColumns[propertyIndex];
-    RLMObject *selectedInstance = [displayedType instanceAtIndex:row];
-    
-    NSNumber *result = nil;
-    if (sender.indexOfSelectedItem > 0) {
-        result = @((BOOL)(sender.indexOfSelectedItem == 2));
-    }
-    
-    RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
-    [realm beginWriteTransaction];
-    selectedInstance[propertyNode.name] = result;
-    [realm commitWriteTransaction];
-    
-    [self.parentWindowController reloadAllWindows];
-}
-
 - (void)rightClickedLocation:(RLMTableLocation)location
 {
     NSUInteger row = location.row;
@@ -1142,76 +1030,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 }
 
 - (void)userDoubleClicked:(NSTableView *)sender {
-    NSInteger row = self.tableView.clickedRow;
-    NSInteger column = self.tableView.clickedColumn;
-    NSInteger propertyIndex = [self propertyIndexForColumn:column];
-    
-    if (row == NOT_A_ROW || propertyIndex < 0 || self.realmIsLocked) {
-        return;
-    }
-    
-    RLMTypeNode *displayedType = self.displayedType;
-    RLMClassProperty *propertyNode = displayedType.propertyColumns[propertyIndex];
-    RLMObject *selectedObject = [displayedType instanceAtIndex:row];
-    id propertyValue = selectedObject[propertyNode.name];
-    
-    switch (propertyNode.type) {
-        case RLMPropertyTypeDate: {
-            // Create a menu with a single menu item, and later populate it with the propertyValue
-            NSMenu *menu = [[NSMenu alloc] initWithTitle:@""];
-            NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"" action:NULL keyEquivalent:@""];
-            
-            NSSize intercellSpacing = [self.tableView intercellSpacing];
-            NSRect frame = [self.tableView frameOfCellAtColumn:column row:row];
-            frame.origin.x -= 0.5*intercellSpacing.width;
-            frame.origin.y -= 0.5*intercellSpacing.height;
-            frame.size.width += intercellSpacing.width;
-            frame.size.height += intercellSpacing.height;
-            
-            frame.size.height = MAX(23.0, frame.size.height);
-            
-            // Set up a date picker with no border or background
-            NSDatePicker *datepicker = [[NSDatePicker alloc] initWithFrame:frame];
-            datepicker.bordered = NO;
-            datepicker.drawsBackground = NO;
-            datepicker.datePickerStyle = NSDatePickerStyleTextFieldAndStepper;
-            datepicker.datePickerElements = NSDatePickerElementFlagHourMinuteSecond
-              | NSDatePickerElementFlagYearMonthDay | NSDatePickerElementFlagTimeZone;
-            datepicker.dateValue = propertyValue;
-            
-            item.view = datepicker;
-            [menu addItem:item];
-            
-            if ([menu popUpMenuPositioningItem:nil atLocation:frame.origin inView:self.tableView]) {
-                RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
-                [realm beginWriteTransaction];
-                selectedObject[propertyNode.name] = datepicker.dateValue;
-                [realm commitWriteTransaction];
-                [self.tableView reloadData];
-            }
-            break;
-        }
-            
-        case RLMPropertyTypeInt:
-        case RLMPropertyTypeFloat:
-        case RLMPropertyTypeDouble:
-        case RLMPropertyTypeString: {
-            // Start editing the textfield
-            NSTableCellView *cellView = [self.tableView viewAtColumn:column row:row makeIfNecessary:NO];
-            [[cellView.textField window] makeFirstResponder:cellView.textField];
-            break;
-        }
-        case RLMPropertyTypeAny:
-        case RLMPropertyTypeBool:
-        case RLMPropertyTypeData:
-        case RLMPropertyTypeObject:
-        case RLMPropertyTypeLinkingObjects:
-        case RLMPropertyTypeObjectId:
-        case RLMPropertyTypeDecimal128:
-        case RLMPropertyTypeUUID:
-            // Do nothing
-            break;
-    }
+    // Inline editing is retired; the inspector panel handles property edits.
 }
 
 #pragma mark - Public Methods - Table View Construction
