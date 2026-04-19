@@ -147,11 +147,20 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     self.splitView.autosaveName = dividerAutosave;
 
     if (!hadSavedDividerPositions) {
-        // First launch: open the inspector at 300pt. After that, the split view
-        // autosave keeps whatever width the user left it at.
+        // First launch: open the inspector at 280pt with drag room on either side.
+        // Make sure the window is wide enough that the split view can honor the
+        // pane minimums plus a 280pt inspector; otherwise divider drags get clamped.
+        static const CGFloat kInitialInspectorWidth = 280.0;
+        static const CGFloat kInitialDragHeadroom = 80.0;
+        CGFloat requiredWidth = 225 + 400 + kInitialInspectorWidth + kInitialDragHeadroom;
+        NSRect frame = self.window.frame;
+        if (frame.size.width < requiredWidth) {
+            frame.size.width = requiredWidth;
+            [self.window setFrame:frame display:NO];
+        }
         CGFloat totalWidth = self.splitView.bounds.size.width;
         if (totalWidth > 0 && self.splitView.arrangedSubviews.count == 3) {
-            [self.splitView setPosition:(totalWidth - 280) ofDividerAtIndex:1];
+            [self.splitView setPosition:(totalWidth - kInitialInspectorWidth) ofDividerAtIndex:1];
         }
     }
 }
@@ -171,8 +180,11 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     [splitVC addSplitViewItem:contentItem];
 
     NSSplitViewItem *inspectorItem = [NSSplitViewItem inspectorWithViewController:self.inspectorViewController];
-    inspectorItem.minimumThickness = 260;
-    inspectorItem.maximumThickness = 420;
+    inspectorItem.minimumThickness = 220;
+    inspectorItem.maximumThickness = NSSplitViewItemUnspecifiedDimension;
+    if (@available(macOS 11.0, *)) {
+        inspectorItem.automaticMaximumThickness = NSSplitViewItemUnspecifiedDimension;
+    }
     inspectorItem.canCollapse = YES;
     [splitVC addSplitViewItem:inspectorItem];
 

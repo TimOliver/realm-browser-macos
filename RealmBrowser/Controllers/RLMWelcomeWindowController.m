@@ -20,6 +20,7 @@
 #import "RLMBrowserConstants.h"
 #import "RLMTestDataGenerator.h"
 #import "RLMWelcomeActionButton.h"
+#import "RLMWelcomeRecentsCellView.h"
 #import "TestClasses.h"
 
 static const CGFloat kWelcomeWindowWidth = 750.0;
@@ -29,65 +30,6 @@ static const CGFloat kAppIconSize = 130.0;
 static const CGFloat kActionButtonWidth = 350.0;
 static const CGFloat kActionButtonHeight = 34.0;
 static const CGFloat kRecentsRowHeight = 44.0;
-
-@interface RLMWelcomeRecentsCellView : NSTableCellView
-@property (nonatomic, strong) NSImageView *iconView;
-@property (nonatomic, strong) NSTextField *titleLabel;
-@property (nonatomic, strong) NSTextField *subtitleLabel;
-@end
-
-@implementation RLMWelcomeRecentsCellView
-
-- (instancetype)initWithFrame:(NSRect)frameRect
-{
-    self = [super initWithFrame:frameRect];
-    if (!self) { return nil; }
-
-    self.iconView = [[NSImageView alloc] init];
-    self.iconView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.iconView.imageScaling = NSImageScaleProportionallyDown;
-    [self addSubview:self.iconView];
-
-    self.titleLabel = [NSTextField labelWithString:@""];
-    self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.titleLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
-    self.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    [self addSubview:self.titleLabel];
-
-    self.subtitleLabel = [NSTextField labelWithString:@""];
-    self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.subtitleLabel.font = [NSFont systemFontOfSize:12.0 weight:NSFontWeightRegular];
-    self.subtitleLabel.textColor = [NSColor secondaryLabelColor];
-    self.subtitleLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
-    [self addSubview:self.subtitleLabel];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [self.iconView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12.0],
-        [self.iconView.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-        [self.iconView.widthAnchor constraintEqualToConstant:32.0],
-        [self.iconView.heightAnchor constraintEqualToConstant:32.0],
-
-        [self.titleLabel.leadingAnchor constraintEqualToAnchor:self.iconView.trailingAnchor constant:8.0],
-        [self.titleLabel.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-12.0],
-        [self.titleLabel.topAnchor constraintEqualToAnchor:self.iconView.topAnchor constant:-1.0],
-
-        [self.subtitleLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
-        [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.titleLabel.trailingAnchor],
-        [self.subtitleLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:2.0],
-    ]];
-
-    return self;
-}
-
-- (void)setBackgroundStyle:(NSBackgroundStyle)backgroundStyle
-{
-    [super setBackgroundStyle:backgroundStyle];
-    BOOL emphasized = backgroundStyle == NSBackgroundStyleEmphasized;
-    self.titleLabel.textColor = emphasized ? [NSColor alternateSelectedControlTextColor] : [NSColor labelColor];
-    self.subtitleLabel.textColor = emphasized ? [NSColor alternateSelectedControlTextColor] : [NSColor secondaryLabelColor];
-}
-
-@end
 
 @interface RLMWelcomeWindowController () <NSTableViewDataSource, NSTableViewDelegate>
 
@@ -286,10 +228,10 @@ static const CGFloat kRecentsRowHeight = 44.0;
     [rightPane addSubview:self.recentsEmptyLabel];
 
     [NSLayoutConstraint activateConstraints:@[
-        [scrollView.topAnchor constraintEqualToAnchor:rightPane.topAnchor constant:4.0],
-        [scrollView.bottomAnchor constraintEqualToAnchor:rightPane.bottomAnchor constant:-4.0],
-        [scrollView.leadingAnchor constraintEqualToAnchor:rightPane.leadingAnchor constant:4.0],
-        [scrollView.trailingAnchor constraintEqualToAnchor:rightPane.trailingAnchor constant:-4.0],
+        [scrollView.topAnchor constraintEqualToAnchor:rightPane.topAnchor constant:0.0],
+        [scrollView.bottomAnchor constraintEqualToAnchor:rightPane.bottomAnchor constant:0.0],
+        [scrollView.leadingAnchor constraintEqualToAnchor:rightPane.leadingAnchor constant:0.0],
+        [scrollView.trailingAnchor constraintEqualToAnchor:rightPane.trailingAnchor constant:0.0],
 
         [self.recentsEmptyLabel.centerXAnchor constraintEqualToAnchor:rightPane.centerXAnchor],
         [self.recentsEmptyLabel.centerYAnchor constraintEqualToAnchor:rightPane.centerYAnchor],

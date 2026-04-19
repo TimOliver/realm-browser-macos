@@ -33,6 +33,7 @@
 		844C34E3194859080027E902 /* TestClasses.m in Sources */ = {isa = PBXBuildFile; fileRef = 844C34E2194859080027E902 /* TestClasses.m */; };
 		8457294D1962E3860076D4F1 /* RLMTableView.m in Sources */ = {isa = PBXBuildFile; fileRef = 8457294C1962E3860076D4F1 /* RLMTableView.m */; };
 		8457294E1962E3860076D4F2 /* RLMWelcomeActionButton.m in Sources */ = {isa = PBXBuildFile; fileRef = 8457294F1962E3860076D4F2 /* RLMWelcomeActionButton.m */; };
+		8457295A1962E3860076D4F3 /* RLMWelcomeRecentsCellView.m in Sources */ = {isa = PBXBuildFile; fileRef = 8457295B1962E3860076D4F3 /* RLMWelcomeRecentsCellView.m */; };
 		8474E2B419544D8000BCA755 /* RLMTypeOutlineViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 8474E2B319544D8000BCA755 /* RLMTypeOutlineViewController.m */; };
 		8474E2BD195452BE00BCA755 /* RLMInstanceTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 8474E2BC195452BE00BCA755 /* RLMInstanceTableViewController.m */; };
 		84754ABE193CA4600093604E /* RLMRealmBrowserWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 84754ABD193CA4600093604E /* RLMRealmBrowserWindowController.m */; };
@@ -137,6 +138,8 @@
 		8457294C1962E3860076D4F1 /* RLMTableView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMTableView.m; sourceTree = "<group>"; };
 		8457294F1962E3860076D4F2 /* RLMWelcomeActionButton.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMWelcomeActionButton.m; sourceTree = "<group>"; };
 		845729501962E3860076D4F2 /* RLMWelcomeActionButton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RLMWelcomeActionButton.h; sourceTree = "<group>"; };
+		8457295B1962E3860076D4F3 /* RLMWelcomeRecentsCellView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMWelcomeRecentsCellView.m; sourceTree = "<group>"; };
+		8457295C1962E3860076D4F3 /* RLMWelcomeRecentsCellView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RLMWelcomeRecentsCellView.h; sourceTree = "<group>"; };
 		8474E2B219544D8000BCA755 /* RLMTypeOutlineViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RLMTypeOutlineViewController.h; sourceTree = "<group>"; };
 		8474E2B319544D8000BCA755 /* RLMTypeOutlineViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMTypeOutlineViewController.m; sourceTree = "<group>"; };
 		8474E2BC195452BE00BCA755 /* RLMInstanceTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMInstanceTableViewController.m; sourceTree = "<group>"; };
@@ -466,6 +469,8 @@
 				8457294C1962E3860076D4F1 /* RLMTableView.m */,
 				845729501962E3860076D4F2 /* RLMWelcomeActionButton.h */,
 				8457294F1962E3860076D4F2 /* RLMWelcomeActionButton.m */,
+				8457295C1962E3860076D4F3 /* RLMWelcomeRecentsCellView.h */,
+				8457295B1962E3860076D4F3 /* RLMWelcomeRecentsCellView.m */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -669,6 +674,7 @@
 				228D1F871A1CAD660028562A /* RLMResultsNode.m in Sources */,
 				8457294D1962E3860076D4F1 /* RLMTableView.m in Sources */,
 				8457294E1962E3860076D4F2 /* RLMWelcomeActionButton.m in Sources */,
+				8457295A1962E3860076D4F3 /* RLMWelcomeRecentsCellView.m in Sources */,
 				22A55FF119D19842009178BC /* RLMDescriptions.m in Sources */,
 				84E35A49196AD991007F0344 /* RLMNavigationStack.m in Sources */,
 				36B669CE1B8B096A00F04AE1 /* RLMObjectLinkSelectionViewController.m in Sources */,
