@@ -27,21 +27,25 @@
 #import "RLMEncryptionKeyWindowController.h"
 #import "RLMBrowserConstants.h"
 
-NSString * const kRealmLockedImage = @"RealmLocked";
-NSString * const kRealmUnlockedImage = @"RealmUnlocked";
+NSString * const kRealmLockedSymbolName = @"lock.fill";
+NSString * const kRealmUnlockedSymbolName = @"lock.open";
 NSString * const kRealmLockedTooltip = @"Unlock to enable editing";
 NSString * const kRealmUnlockedTooltip = @"Lock to prevent editing";
 NSString * const kRealmKeyIsLockedForRealm = @"LockedRealm:%@";
+
+static NSToolbarItemIdentifier const kNavigationItemIdentifier = @"Navigation";
+static NSToolbarItemIdentifier const kSearchItemIdentifier = @"Search";
+static NSToolbarItemIdentifier const kLockItemIdentifier = @"RealmLockItem";
 
 NSString * const kRealmKeyWindowFrameForRealm = @"WindowFrameForRealm:%@";
 NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 @interface RLMRealmBrowserWindowController()<NSWindowDelegate>
 
-@property (atomic, weak) IBOutlet NSSplitView *splitView;
-@property (nonatomic, strong) IBOutlet NSSegmentedControl *navigationButtons;
-@property (atomic, weak) IBOutlet NSToolbarItem *lockRealmButton;
-@property (nonatomic, strong) IBOutlet NSSearchField *searchField;
+@property (atomic, weak) NSSplitView *splitView;
+@property (nonatomic, strong) NSSegmentedControl *navigationButtons;
+@property (atomic, weak) NSToolbarItem *lockRealmButton;
+@property (nonatomic, strong) NSSearchField *searchField;
 
 @property (nonatomic, strong) RLMExportIndicatorWindowController *exportWindowController;
 @property (nonatomic, strong) RLMEncryptionKeyWindowController *encryptionController;
@@ -52,6 +56,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 @implementation RLMRealmBrowserWindowController {
     RLMNavigationStack *navigationStack;
+    BOOL _didPerformInitialSetup;
 }
 
 @dynamic document;
@@ -65,6 +70,11 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
     [super setDocument:document];
 
+    if (document && !_didPerformInitialSetup) {
+        _didPerformInitialSetup = YES;
+        [self performInitialWindowSetup];
+    }
+
     if (self.windowLoaded && self.window.isVisible) {
         [self handleDocumentState];
     }
@@ -72,16 +82,168 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
 #pragma mark - NSWindowController Overrides
 
-- (void)windowDidLoad
+- (instancetype)init
 {
-    navigationStack = [[RLMNavigationStack alloc] init];
+    NSRect contentRect = NSMakeRect(0, 0, 1000, 700);
+    NSWindowStyleMask mask = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
+                              NSWindowStyleMaskResizable | NSWindowStyleMaskFullSizeContentView);
+    NSWindow *window = [[NSWindow alloc] initWithContentRect:contentRect styleMask:mask backing:NSBackingStoreBuffered defer:NO];
+    window.minSize = NSMakeSize(440, 200);
+    window.releasedWhenClosed = NO;
+    window.restorable = NO;
+    window.titlebarAppearsTransparent = YES;
+    window.toolbarStyle = NSWindowToolbarStyleUnified;
+    window.collectionBehavior |= NSWindowCollectionBehaviorFullScreenPrimary;
 
+    self = [super initWithWindow:window];
+    if (self) {
+        navigationStack = [[RLMNavigationStack alloc] init];
+
+        // Build the pane view controllers and install the split view controller up-front,
+        // before the window is shown. Restoring the window to its saved frame with a missing
+        // contentViewController leaves an empty placeholder chrome, so we make sure the
+        // real content is in place before any show path runs.
+        self.outlineViewController = [[RLMTypeOutlineViewController alloc] init];
+        self.outlineViewController.parentWindowController = self;
+        self.tableViewController = [[RLMInstanceTableViewController alloc] init];
+        self.tableViewController.parentWindowController = self;
+        [self installSplitViewController];
+
+        NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"RLMRealmBrowserToolbar"];
+        toolbar.delegate = self;
+        toolbar.allowsUserCustomization = YES;
+        toolbar.autosavesConfiguration = YES;
+        toolbar.displayMode = NSToolbarDisplayModeIconOnly;
+        window.toolbar = toolbar;
+
+        // Modify responder chain to handle shortcuts for table view (workaround for https://github.com/realm/realm-browser-osx/issues/241)
+        self.outlineViewController.tableView.enclosingScrollView.nextResponder = self.tableViewController.tableView;
+    }
+    return self;
+}
+
+- (NSString *)windowNibName
+{
+    return nil;
+}
+
+// NSWindowController.windowDidLoad doesn't fire when the window is supplied via initWithWindow:.
+// This runs from -setDocument: the first time the document is assigned so we can pick up
+// document-specific configuration (autosave keys etc.) that aren't available in -init.
+- (void)performInitialWindowSetup
+{
     NSString *realmPath = self.document.fileURL.path;
-    [self setWindowFrameAutosaveName:[NSString stringWithFormat:kRealmKeyWindowFrameForRealm, realmPath]];
-    [self.splitView setAutosaveName:[NSString stringWithFormat:kRealmKeyOutlineWidthForRealm, realmPath]];
+    NSString *windowAutosave = [NSString stringWithFormat:kRealmKeyWindowFrameForRealm, realmPath];
+    if (![self.window setFrameUsingName:windowAutosave]) {
+        [self.window center];
+    }
+    [self setWindowFrameAutosaveName:windowAutosave];
 
-    // Modify responder chain to handle shortcuts for table view (workaround for https://github.com/realm/realm-browser-osx/issues/241)
-    self.outlineViewController.tableView.enclosingScrollView.nextResponder = self.tableViewController.tableView;
+    self.splitView.autosaveName = [NSString stringWithFormat:kRealmKeyOutlineWidthForRealm, realmPath];
+}
+
+- (void)installSplitViewController
+{
+    NSSplitViewController *splitVC = [[NSSplitViewController alloc] init];
+
+    NSSplitViewItem *sidebarItem = [NSSplitViewItem sidebarWithViewController:self.outlineViewController];
+    sidebarItem.minimumThickness = 225;
+    sidebarItem.maximumThickness = 400;
+    sidebarItem.canCollapse = NO;
+    [splitVC addSplitViewItem:sidebarItem];
+
+    NSSplitViewItem *contentItem = [NSSplitViewItem splitViewItemWithViewController:self.tableViewController];
+    contentItem.minimumThickness = 400;
+    [splitVC addSplitViewItem:contentItem];
+
+    self.window.contentViewController = splitVC;
+    self.splitView = splitVC.splitView;
+}
+
+- (NSToolbarItem *)makeNavigationToolbarItem
+{
+    NSSegmentedControl *segmented = [NSSegmentedControl segmentedControlWithImages:@[
+        [NSImage imageWithSystemSymbolName:@"chevron.backward" accessibilityDescription:@"Back"],
+        [NSImage imageWithSystemSymbolName:@"chevron.forward" accessibilityDescription:@"Forward"],
+    ] trackingMode:NSSegmentSwitchTrackingMomentary target:self action:@selector(userClicksOnNavigationButtons:)];
+    segmented.segmentStyle = NSSegmentStyleSeparated;
+
+    NSToolbarItem *item = [[NSToolbarItem alloc] initWithItemIdentifier:kNavigationItemIdentifier];
+    item.view = segmented;
+    item.label = @"Navigation";
+    item.paletteLabel = @"Navigation";
+    item.navigational = YES;
+
+    self.navigationButtons = segmented;
+    return item;
+}
+
+- (NSToolbarItem *)makeSearchToolbarItem
+{
+    NSSearchField *search = [[NSSearchField alloc] init];
+    search.target = self;
+    search.action = @selector(searchAction:);
+    search.translatesAutoresizingMaskIntoConstraints = NO;
+    [search.widthAnchor constraintEqualToConstant:200].active = YES;
+
+    NSToolbarItem *item = [[NSToolbarItem alloc] initWithItemIdentifier:kSearchItemIdentifier];
+    item.view = search;
+    item.label = @"Search";
+    item.paletteLabel = @"Search";
+
+    self.searchField = search;
+    return item;
+}
+
+- (NSToolbarItem *)makeLockToolbarItem
+{
+    NSToolbarItem *item = [[NSToolbarItem alloc] initWithItemIdentifier:kLockItemIdentifier];
+    item.label = @"Realm";
+    item.paletteLabel = @"Realm";
+    item.toolTip = kRealmUnlockedTooltip;
+    item.image = [NSImage imageWithSystemSymbolName:kRealmUnlockedSymbolName accessibilityDescription:kRealmUnlockedTooltip];
+    item.target = self;
+    item.action = @selector(userClickedLockRealm:);
+    self.lockRealmButton = item;
+    return item;
+}
+
+#pragma mark - NSToolbarDelegate
+
+- (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar
+{
+    return @[kNavigationItemIdentifier,
+             kSearchItemIdentifier,
+             kLockItemIdentifier,
+             NSToolbarFlexibleSpaceItemIdentifier,
+             NSToolbarSidebarTrackingSeparatorItemIdentifier];
+}
+
+- (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar
+{
+    return @[NSToolbarFlexibleSpaceItemIdentifier,
+             kLockItemIdentifier,
+             NSToolbarSidebarTrackingSeparatorItemIdentifier,
+             kNavigationItemIdentifier,
+             NSToolbarFlexibleSpaceItemIdentifier,
+             kSearchItemIdentifier];
+}
+
+- (NSToolbarItem *)toolbar:(NSToolbar *)toolbar itemForItemIdentifier:(NSToolbarItemIdentifier)itemIdentifier willBeInsertedIntoToolbar:(BOOL)flag
+{
+    if ([itemIdentifier isEqualToString:kNavigationItemIdentifier]) {
+        return [self makeNavigationToolbarItem];
+    }
+    if ([itemIdentifier isEqualToString:kSearchItemIdentifier]) {
+        return [self makeSearchToolbarItem];
+    }
+    if ([itemIdentifier isEqualToString:kLockItemIdentifier]) {
+        return [self makeLockToolbarItem];
+    }
+    if ([itemIdentifier isEqualToString:NSToolbarSidebarTrackingSeparatorItemIdentifier]) {
+        return [NSTrackingSeparatorToolbarItem trackingSeparatorToolbarItemWithIdentifier:itemIdentifier splitView:self.splitView dividerIndex:0];
+    }
+    return nil;
 }
 
 - (IBAction)showWindow:(id)sender
@@ -342,8 +504,10 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     
     BOOL realmIsLocked = [[NSUserDefaults standardUserDefaults] boolForKey:key];
     self.tableViewController.realmIsLocked = realmIsLocked;
-    self.lockRealmButton.image = [NSImage imageNamed:realmIsLocked ? kRealmLockedImage : kRealmUnlockedImage];
-    self.lockRealmButton.toolTip = realmIsLocked ? kRealmLockedTooltip : kRealmUnlockedTooltip;
+    NSString *symbolName = realmIsLocked ? kRealmLockedSymbolName : kRealmUnlockedSymbolName;
+    NSString *tooltip = realmIsLocked ? kRealmLockedTooltip : kRealmUnlockedTooltip;
+    self.lockRealmButton.image = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:tooltip];
+    self.lockRealmButton.toolTip = tooltip;
 
     if (self.tableViewController.displayedType.isInvalidated) {
         [navigationStack reset];
@@ -359,25 +523,32 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 {
     if (!controller.navigationFromHistory) {
         RLMNavigationState *oldState = navigationStack.currentState;
-        
+
         [navigationStack pushState:state];
         [self updateNavigationButtons];
-        
+
         if (controller == self.tableViewController || controller == nil) {
             [self.outlineViewController updateUsingState:state oldState:oldState];
         }
-        
+
         [self.tableViewController updateUsingState:state oldState:oldState];
     }
+
+    [self updateWindowSubtitle];
 
     // Searching is not implemented for link arrays yet
     BOOL isArray = [state isMemberOfClass:[RLMArrayNavigationState class]];
     [self.searchField setEnabled:!isArray];
 }
 
+- (void)updateWindowSubtitle
+{
+    self.window.subtitle = navigationStack.currentState.selectedType.name ?: @"";
+}
+
 - (void)newWindowWithNavigationState:(RLMNavigationState *)state
 {
-    RLMRealmBrowserWindowController *wc = [[RLMRealmBrowserWindowController alloc] initWithWindowNibName:self.windowNibName];
+    RLMRealmBrowserWindowController *wc = [[RLMRealmBrowserWindowController alloc] init];
 
     [self.document addWindowController:wc];
     [self.document showWindows];
@@ -409,8 +580,9 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
         default:
             break;
     }
-    
+
     [self updateNavigationButtons];
+    [self updateWindowSubtitle];
 }
 
 - (IBAction)userClickedLockRealm:(id)sender

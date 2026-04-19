@@ -53,11 +53,12 @@
 		84E35A42196A9F3B007F0344 /* RLMNavigationState.m in Sources */ = {isa = PBXBuildFile; fileRef = 84E35A41196A9F3B007F0344 /* RLMNavigationState.m */; };
 		84E35A49196AD991007F0344 /* RLMNavigationStack.m in Sources */ = {isa = PBXBuildFile; fileRef = 84E35A48196AD991007F0344 /* RLMNavigationStack.m */; };
 		84E35A4D196B021B007F0344 /* RLMArrayNavigationState.m in Sources */ = {isa = PBXBuildFile; fileRef = 84E35A4C196B021B007F0344 /* RLMArrayNavigationState.m */; };
+		990A20F28135BE9035440D2F /* RLMInstanceTableViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = DF96E163153312CDA32445FA /* RLMInstanceTableViewController.xib */; };
 		9D25DD9EEFA4ED17DD9B0B58 /* Pods_RealmBrowser.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A5C7B6B3C4F4B2895F8110D /* Pods_RealmBrowser.framework */; };
 		ACEB3A33FC2E3E36DD27E4F5 /* Pods_RealmBrowserTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 133FC3EB9B7FDAECC622E59D /* Pods_RealmBrowserTests.framework */; };
+		B04FF2CEFD4D07272095E008 /* RLMTypeOutlineViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 32348656AC2FC730DC95846F /* RLMTypeOutlineViewController.xib */; };
 		C2986A7D1D6C811E005A2CD6 /* EncryptionKeyWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 2257869F1BD564F40012436A /* EncryptionKeyWindow.xib */; };
 		C2986A7E1D6C8122005A2CD6 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 84E0F9671921F3B900D6CA14 /* MainMenu.xib */; };
-		C2986A7F1D6C8126005A2CD6 /* RLMDocument.xib in Resources */ = {isa = PBXBuildFile; fileRef = 84E0F9641921F3B900D6CA14 /* RLMDocument.xib */; };
 		C2986A821D6C81C2005A2CD6 /* RLMUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = C2986A811D6C81C2005A2CD6 /* RLMUtils.m */; };
 		C2986A871D6C823D005A2CD6 /* RLMEncryptionKeyWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = C2986A841D6C823D005A2CD6 /* RLMEncryptionKeyWindowController.m */; };
 		C2986A881D6C823D005A2CD6 /* RLMExportIndicatorWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = C2986A861D6C823D005A2CD6 /* RLMExportIndicatorWindowController.m */; };
@@ -161,7 +162,6 @@
 		84E0F95B1921F3B900D6CA14 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		84E0F95D1921F3B900D6CA14 /* RealmBrowser-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RealmBrowser-Prefix.pch"; sourceTree = "<group>"; };
 		84E0F95F1921F3B900D6CA14 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.rtf; name = en; path = en.lproj/Credits.rtf; sourceTree = "<group>"; };
-		84E0F9651921F3B900D6CA14 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/RLMDocument.xib; sourceTree = "<group>"; };
 		84E0F9681921F3B900D6CA14 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		84E0F96A1921F3B900D6CA14 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		84E0F9701921F3B900D6CA14 /* RealmBrowserTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RealmBrowserTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -174,6 +174,8 @@
 		84E35A48196AD991007F0344 /* RLMNavigationStack.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMNavigationStack.m; sourceTree = "<group>"; };
 		84E35A4B196B021B007F0344 /* RLMArrayNavigationState.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RLMArrayNavigationState.h; sourceTree = "<group>"; };
 		84E35A4C196B021B007F0344 /* RLMArrayNavigationState.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMArrayNavigationState.m; sourceTree = "<group>"; };
+		A7C9A47BBBBB62908C192591 /* Base */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.xib; name = Base; path = Base.lproj/RLMInstanceTableViewController.xib; sourceTree = "<group>"; };
+		ABED6726D067EE4DA0BB53C7 /* Base */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.xib; name = Base; path = Base.lproj/RLMTypeOutlineViewController.xib; sourceTree = "<group>"; };
 		C26624291DA66378001102F4 /* RLMInstanceTableViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RLMInstanceTableViewController.h; sourceTree = "<group>"; };
 		C2986A801D6C81C2005A2CD6 /* RLMUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RLMUtils.h; sourceTree = "<group>"; };
 		C2986A811D6C81C2005A2CD6 /* RLMUtils.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RLMUtils.m; sourceTree = "<group>"; };
@@ -217,9 +219,10 @@
 			children = (
 				2257869F1BD564F40012436A /* EncryptionKeyWindow.xib */,
 				84E0F9671921F3B900D6CA14 /* MainMenu.xib */,
-				84E0F9641921F3B900D6CA14 /* RLMDocument.xib */,
 				22DC87E71B9808790024BA34 /* RLMExportIndicatorWindowController.xib */,
 				36B669CA1B8B057F00F04AE1 /* RLMObjectLinkSelectionViewController.xib */,
+				32348656AC2FC730DC95846F /* RLMTypeOutlineViewController.xib */,
+				DF96E163153312CDA32445FA /* RLMInstanceTableViewController.xib */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -550,12 +553,13 @@
 				84E0F95A1921F3B900D6CA14 /* InfoPlist.strings in Resources */,
 				C2986A7E1D6C8122005A2CD6 /* MainMenu.xib in Resources */,
 				84E0F96B1921F3B900D6CA14 /* Images.xcassets in Resources */,
-				C2986A7F1D6C8126005A2CD6 /* RLMDocument.xib in Resources */,
 				C2986A7D1D6C811E005A2CD6 /* EncryptionKeyWindow.xib in Resources */,
 				2215F6361D0011CD005A46F7 /* RealmFileIcon.icns in Resources */,
 				84E0F9601921F3B900D6CA14 /* Credits.rtf in Resources */,
 				22DC87E81B9808790024BA34 /* RLMExportIndicatorWindowController.xib in Resources */,
 				36B669CB1B8B057F00F04AE1 /* RLMObjectLinkSelectionViewController.xib in Resources */,
+				B04FF2CEFD4D07272095E008 /* RLMTypeOutlineViewController.xib in Resources */,
+				990A20F28135BE9035440D2F /* RLMInstanceTableViewController.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -704,6 +708,14 @@
 			path = .;
 			sourceTree = "<group>";
 		};
+		32348656AC2FC730DC95846F /* RLMTypeOutlineViewController.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				ABED6726D067EE4DA0BB53C7 /* Base */,
+			);
+			name = RLMTypeOutlineViewController.xib;
+			sourceTree = "<group>";
+		};
 		84E0F9581921F3B900D6CA14 /* InfoPlist.strings */ = {
 			isa = PBXVariantGroup;
 			children = (
@@ -719,15 +731,6 @@
 				84E0F95F1921F3B900D6CA14 /* en */,
 			);
 			name = Credits.rtf;
-			path = .;
-			sourceTree = "<group>";
-		};
-		84E0F9641921F3B900D6CA14 /* RLMDocument.xib */ = {
-			isa = PBXVariantGroup;
-			children = (
-				84E0F9651921F3B900D6CA14 /* Base */,
-			);
-			name = RLMDocument.xib;
 			path = .;
 			sourceTree = "<group>";
 		};
@@ -747,6 +750,14 @@
 			);
 			name = InfoPlist.strings;
 			path = .;
+			sourceTree = "<group>";
+		};
+		DF96E163153312CDA32445FA /* RLMInstanceTableViewController.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A7C9A47BBBBB62908C192591 /* Base */,
+			);
+			name = RLMInstanceTableViewController.xib;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

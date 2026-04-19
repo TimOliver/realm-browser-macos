@@ -122,13 +122,8 @@
 
 - (void)makeWindowControllers
 {
-    RLMRealmBrowserWindowController *windowController = [[RLMRealmBrowserWindowController alloc] initWithWindowNibName:self.windowNibName];
+    RLMRealmBrowserWindowController *windowController = [[RLMRealmBrowserWindowController alloc] init];
     [self addWindowController:windowController];
-}
-
-- (NSString *)windowNibName
-{
-    return @"RLMDocument";
 }
 
 - (NSData *)dataOfType:(NSString *)typeName error:(NSError **)outError
@@ -147,7 +142,7 @@
 
 - (NSString *)displayName
 {
-    return self.fileURL.lastPathComponent.stringByDeletingPathExtension;
+    return self.fileURL.lastPathComponent;
 }
 
 @end

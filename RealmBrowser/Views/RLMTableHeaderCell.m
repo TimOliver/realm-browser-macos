@@ -24,13 +24,13 @@
 {
     CGRect fillRect, borderRect;
     CGRectDivide(cellFrame, &borderRect, &fillRect, 1.0, CGRectMaxYEdge);
-    
-    [[NSColor whiteColor] set];
+
+    [[NSColor windowBackgroundColor] set];
     NSRectFill(fillRect);
-    
-    [[NSColor grayColor] set];
+
+    [[NSColor separatorColor] set];
     NSRectFill(borderRect);
-    
+
     [self drawInteriorWithFrame:cellFrame inView:view];
 }
 
@@ -59,7 +59,7 @@
     NSRange secondStringRange = NSMakeRange(stringValue.length - self.secondLine.length, self.secondLine.length);
     
     [attributedStringValue addAttribute:NSFontAttributeName value:[NSFont boldSystemFontOfSize:12.0] range:firstStringRange];
-    [attributedStringValue addAttribute:NSForegroundColorAttributeName value:[NSColor grayColor] range:secondStringRange];
+    [attributedStringValue addAttribute:NSForegroundColorAttributeName value:[NSColor secondaryLabelColor] range:secondStringRange];
     
     self.attributedStringValue = attributedStringValue;
 }

@@ -27,7 +27,7 @@
 @property (nonatomic, readonly) NSTableView *tableView;
 @property (nonatomic, readonly) BOOL navigationFromHistory;
 @property (nonatomic, strong) RLMTypeNode *displayedType;
-@property (nonatomic, weak) IBOutlet RLMRealmBrowserWindowController *parentWindowController;
+@property (nonatomic, weak) RLMRealmBrowserWindowController *parentWindowController;
 
 - (void)updateUsingState:(RLMNavigationState *)newState oldState:(RLMNavigationState *)oldState;
 

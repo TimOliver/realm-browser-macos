@@ -23,7 +23,7 @@
 
 - (void)setBackgroundStyle:(NSBackgroundStyle)backgroundStyle {
     [super setBackgroundStyle:backgroundStyle];
-    self.textField.textColor = (backgroundStyle == NSBackgroundStyleLight ? [NSColor linkColor] : [NSColor whiteColor]);
+    self.textField.textColor = (backgroundStyle == NSBackgroundStyleEmphasized ? [NSColor alternateSelectedControlTextColor] : [NSColor linkColor]);
 }
 
 @end

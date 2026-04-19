@@ -31,7 +31,7 @@ typedef NS_ENUM(NSInteger, RLMDocumentState) {
 @interface RLMDocument : NSDocument
 
 @property (nonatomic, assign) RLMDocumentState state;
-@property (nonatomic, strong) IBOutlet RLMRealmNode *presentedRealm;
+@property (nonatomic, strong) RLMRealmNode *presentedRealm;
 
 @property (nonatomic, strong, readonly) NSError *error;
 

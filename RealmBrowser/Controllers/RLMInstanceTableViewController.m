@@ -62,6 +62,11 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     RLMDescriptions *realmDescriptions;
 }
 
+- (instancetype)init
+{
+    return [super initWithNibName:NSStringFromClass(self.class) bundle:nil];
+}
+
 #pragma mark - NSObject Overrides
 
 - (void)awakeFromNib
