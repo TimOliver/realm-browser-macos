@@ -228,9 +228,10 @@ static const CGFloat kHorizontalInset = 16.0;
     typeLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightMedium];
     typeLabel.textColor = NSColor.tertiaryLabelColor;
     typeLabel.alignment = NSTextAlignmentRight;
+    typeLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     typeLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [typeLabel setContentHuggingPriority:NSLayoutPriorityDefaultHigh forOrientation:NSLayoutConstraintOrientationHorizontal];
-    [typeLabel setContentCompressionResistancePriority:NSLayoutPriorityRequired forOrientation:NSLayoutConstraintOrientationHorizontal];
+    [typeLabel setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
 
     NSStackView *labelRow = [NSStackView stackViewWithViews:@[nameLabel, typeLabel]];
     labelRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
@@ -309,6 +310,9 @@ static const CGFloat kHorizontalInset = 16.0;
     field.bezelStyle = NSTextFieldRoundedBezel;
     field.controlSize = NSControlSizeLarge;
     field.font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSControlSizeLarge]];
+    field.lineBreakMode = NSLineBreakByTruncatingTail;
+    [field.cell setUsesSingleLineMode:YES];
+    [field setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     field.target = self;
     field.action = @selector(textFieldEdited:);
     field.delegate = self;
@@ -325,6 +329,9 @@ static const CGFloat kHorizontalInset = 16.0;
     field.bezelStyle = NSTextFieldRoundedBezel;
     field.controlSize = NSControlSizeLarge;
     field.font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSControlSizeLarge]];
+    field.lineBreakMode = NSLineBreakByTruncatingTail;
+    [field.cell setUsesSingleLineMode:YES];
+    [field setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
 
     NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
     formatter.numberStyle = NSNumberFormatterDecimalStyle;
@@ -363,6 +370,7 @@ static const CGFloat kHorizontalInset = 16.0;
     picker.action = @selector(datePickerChanged:);
     picker.identifier = property.name;
     picker.enabled = !isPrimaryKey;
+    [picker setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     self.editorsByPropertyName[property.name] = (id)picker;
     return picker;
 }
@@ -372,6 +380,7 @@ static const CGFloat kHorizontalInset = 16.0;
     NSTextField *field = [NSTextField labelWithString:string ?: @""];
     field.lineBreakMode = NSLineBreakByTruncatingTail;
     field.textColor = NSColor.labelColor;
+    [field setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     return field;
 }
 
