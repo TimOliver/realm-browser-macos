@@ -58,7 +58,7 @@
                                                 <constraints>
                                                     <constraint firstAttribute="bottom" secondItem="RE7-fm-65w" secondAttribute="bottom" constant="2" id="RKE-G9-pa5"/>
                                                     <constraint firstAttribute="trailing" secondItem="RE7-fm-65w" secondAttribute="trailing" constant="20" symbolic="YES" id="dLD-tf-L70"/>
-                                                    <constraint firstItem="RE7-fm-65w" firstAttribute="leading" secondItem="vtE-Hx-1bJ" secondAttribute="leading" constant="8" id="fxJ-hK-jvb"/>
+                                                    <constraint firstItem="RE7-fm-65w" firstAttribute="leading" secondItem="vtE-Hx-1bJ" secondAttribute="leading" id="fxJ-hK-jvb"/>
                                                 </constraints>
                                                 <connections>
                                                     <outlet property="textField" destination="RE7-fm-65w" id="8UX-iG-ots"/>
@@ -89,7 +89,7 @@
                                                     </button>
                                                 </subviews>
                                                 <constraints>
-                                                    <constraint firstItem="sym-iv-cls" firstAttribute="leading" secondItem="O58-xq-8no" secondAttribute="leading" constant="8" id="sym-ct-led"/>
+                                                    <constraint firstItem="sym-iv-cls" firstAttribute="leading" secondItem="O58-xq-8no" secondAttribute="leading" id="sym-ct-led"/>
                                                     <constraint firstItem="sym-iv-cls" firstAttribute="centerY" secondItem="O58-xq-8no" secondAttribute="centerY" id="sym-ct-cty"/>
                                                     <constraint firstItem="sym-iv-cls" firstAttribute="width" constant="16" id="sym-ct-wid"/>
                                                     <constraint firstItem="sym-iv-cls" firstAttribute="height" constant="16" id="sym-ct-hgt"/>
