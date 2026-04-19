@@ -32,6 +32,11 @@ static NSToolbarItemIdentifier const kNavigationItemIdentifier = @"Navigation";
 static NSToolbarItemIdentifier const kSearchItemIdentifier = @"Search";
 static NSToolbarItemIdentifier const kInspectorToggleItemIdentifier = @"InspectorToggle";
 
+typedef NS_ENUM(NSInteger, RLMSearchMode) {
+    RLMSearchModeMatch = 0,
+    RLMSearchModePredicate = 1,
+};
+
 NSString * const kRealmKeyWindowFrameForRealm = @"WindowFrameForRealm:%@";
 NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
@@ -45,6 +50,8 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 @property (nonatomic, strong) RLMEncryptionKeyWindowController *encryptionController;
 
 @property (nonatomic, strong) RLMInspectorViewController *inspectorViewController;
+
+@property (nonatomic, assign) RLMSearchMode searchMode;
 
 @property (nonatomic, strong) RLMNotificationToken *documentNotificationToken;
 
@@ -197,7 +204,9 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     search.target = self;
     search.action = @selector(searchAction:);
     search.translatesAutoresizingMaskIntoConstraints = NO;
-    [search.widthAnchor constraintEqualToConstant:200].active = YES;
+    [search.widthAnchor constraintEqualToConstant:256].active = YES;
+    search.searchMenuTemplate = [self searchModeMenuTemplate];
+    [self applySearchModePlaceholderToField:search];
 
     NSToolbarItem *item = [[NSToolbarItem alloc] initWithItemIdentifier:kSearchItemIdentifier];
     item.view = search;
@@ -206,6 +215,47 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
 
     self.searchField = search;
     return item;
+}
+
+- (NSMenu *)searchModeMenuTemplate
+{
+    NSMenu *menu = [[NSMenu alloc] init];
+
+    NSMenuItem *matchItem = [[NSMenuItem alloc] initWithTitle:@"Match with String" action:@selector(selectSearchMode:) keyEquivalent:@""];
+    matchItem.target = self;
+    matchItem.tag = RLMSearchModeMatch;
+    [menu addItem:matchItem];
+
+    NSMenuItem *predicateItem = [[NSMenuItem alloc] initWithTitle:@"Query with NSPredicate" action:@selector(selectSearchMode:) keyEquivalent:@""];
+    predicateItem.target = self;
+    predicateItem.tag = RLMSearchModePredicate;
+    [menu addItem:predicateItem];
+
+    return menu;
+}
+
+- (void)selectSearchMode:(NSMenuItem *)sender
+{
+    self.searchMode = (RLMSearchMode)sender.tag;
+    [self applySearchModePlaceholderToField:self.searchField];
+    if (self.searchField.stringValue.length > 0) {
+        [self searchAction:(NSSearchFieldCell *)self.searchField.cell];
+    }
+}
+
+- (void)applySearchModePlaceholderToField:(NSSearchField *)field
+{
+    field.placeholderString = (self.searchMode == RLMSearchModePredicate)
+        ? @"NSPredicate, e.g. age > 5"
+        : @"Search";
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem *)menuItem
+{
+    if (menuItem.action == @selector(selectSearchMode:)) {
+        menuItem.state = (menuItem.tag == self.searchMode) ? NSControlStateValueOn : NSControlStateValueOff;
+    }
+    return YES;
 }
 
 - (NSToolbarItem *)makeInspectorToggleItem
@@ -608,21 +658,47 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
         return;
     }
 
-    NSArray *columns = typeNode.propertyColumns;
-    NSUInteger columnCount = columns.count;
-    RLMRealm *realm = self.document.presentedRealm.realm;
+    NSPredicate *predicate = (self.searchMode == RLMSearchModePredicate)
+        ? [self predicateFromRawText:searchText]
+        : [self matchPredicateForTypeNode:typeNode searchText:searchText];
+    if (!predicate) {
+        return;
+    }
 
+    RLMRealm *realm = self.document.presentedRealm.realm;
+    RLMResults *result = nil;
+    @try {
+        result = [realm objects:typeNode.name withPredicate:predicate];
+    } @catch (NSException *exception) {
+        // Predicate referenced a non-existent property / wrong type — leave the current state alone.
+        return;
+    }
+
+    RLMQueryNavigationState *state = [[RLMQueryNavigationState alloc] initWithQuery:searchText type:typeNode results:result];
+    [self addNavigationState:state fromViewController:self.tableViewController];
+}
+
+- (NSPredicate *)predicateFromRawText:(NSString *)text
+{
+    @try {
+        return [NSPredicate predicateWithFormat:text];
+    } @catch (NSException *exception) {
+        return nil;
+    }
+}
+
+- (NSPredicate *)matchPredicateForTypeNode:(RLMTypeNode *)typeNode searchText:(NSString *)searchText
+{
+    NSArray *columns = typeNode.propertyColumns;
     NSMutableArray *predicates = [NSMutableArray array];
 
     NSNumberFormatter *floatFormatter = [[NSNumberFormatter alloc] init];
     NSNumberFormatter *integerFormatter = [[NSNumberFormatter alloc] init];
     integerFormatter.allowsFloats = NO;
 
-    for (NSUInteger index = 0; index < columnCount; index++) {
-
-        RLMClassProperty *property = columns[index];
+    for (RLMClassProperty *property in columns) {
         NSExpression *propertyExpression = [NSExpression expressionForKeyPath:property.name];
-        NSExpression *valueExpression;
+        NSExpression *valueExpression = nil;
         NSPredicateOperatorType comparisonOperator = NSEqualToPredicateOperatorType;
         NSComparisonPredicateOptions comparisonOptions = 0;
 
@@ -649,7 +725,6 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
                 valueExpression = [NSExpression expressionForConstantValue:searchText];
                 comparisonOperator = NSContainsPredicateOperatorType;
                 comparisonOptions = NSCaseInsensitivePredicateOption;
-
                 break;
             }
             case RLMPropertyTypeFloat:
@@ -665,7 +740,6 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
         }
 
         if (!valueExpression) {
-            // We were unable to convert the search text into a predicate for this property type.
             continue;
         }
 
@@ -677,11 +751,10 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
         [predicates addObject:predicate];
     }
 
-    NSPredicate *predicate = [NSCompoundPredicate orPredicateWithSubpredicates:predicates];
-    RLMResults *result = [realm objects:typeNode.name withPredicate:predicate];
-
-    RLMQueryNavigationState *state = [[RLMQueryNavigationState alloc] initWithQuery:searchText type:typeNode results:result];
-    [self addNavigationState:state fromViewController:self.tableViewController];
+    if (predicates.count == 0) {
+        return nil;
+    }
+    return [NSCompoundPredicate orPredicateWithSubpredicates:predicates];
 }
 
 #pragma mark - Private methods
