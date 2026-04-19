@@ -23,6 +23,14 @@
 #import "RLMWelcomeRecentsCellView.h"
 #import "TestClasses.h"
 
+// NSImageView swallows mouse-down events by default, which blocks the window's
+// movableByWindowBackground drag. This subclass opts the view into the drag.
+@interface RLMWelcomeDraggableImageView : NSImageView
+@end
+@implementation RLMWelcomeDraggableImageView
+- (BOOL)mouseDownCanMoveWindow { return YES; }
+@end
+
 static const CGFloat kWelcomeWindowWidth = 750.0;
 static const CGFloat kWelcomeWindowHeight = 420.0;
 static const CGFloat kRightPaneWidth = 280.0;
@@ -93,20 +101,23 @@ static const CGFloat kRecentsRowHeight = 44.0;
 {
     NSView *contentView = self.window.contentView;
 
-    // Left pane (under-page background: naturally darker than window bg in dark mode).
+    // Within-window blending means the materials render from their own palette
+    // instead of sampling the desktop, so the panes don't shift when the window
+    // loses key/main status.
     NSVisualEffectView *leftPane = [[NSVisualEffectView alloc] init];
     leftPane.translatesAutoresizingMaskIntoConstraints = NO;
     leftPane.material = NSVisualEffectMaterialHeaderView;
-    leftPane.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    leftPane.blendingMode = NSVisualEffectBlendingModeWithinWindow;
     leftPane.state = NSVisualEffectStateActive;
+    leftPane.emphasized = YES;
     [contentView addSubview:leftPane];
 
-    // Right pane (denser content-background material for a more opaque sidebar look).
     NSVisualEffectView *rightPane = [[NSVisualEffectView alloc] init];
     rightPane.translatesAutoresizingMaskIntoConstraints = NO;
-    rightPane.material = NSVisualEffectMaterialMenu;
-    rightPane.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    rightPane.material = NSVisualEffectMaterialUnderWindowBackground;
+    rightPane.blendingMode = NSVisualEffectBlendingModeWithinWindow;
     rightPane.state = NSVisualEffectStateActive;
+    rightPane.emphasized = YES;
     [contentView addSubview:rightPane];
 
     [NSLayoutConstraint activateConstraints:@[
@@ -127,7 +138,7 @@ static const CGFloat kRecentsRowHeight = 44.0;
 
 - (void)populateLeftPane:(NSView *)leftPane
 {
-    NSImageView *iconView = [[NSImageView alloc] init];
+    RLMWelcomeDraggableImageView *iconView = [[RLMWelcomeDraggableImageView alloc] init];
     iconView.translatesAutoresizingMaskIntoConstraints = NO;
     iconView.image = [NSApp applicationIconImage];
     iconView.imageScaling = NSImageScaleProportionallyUpOrDown;

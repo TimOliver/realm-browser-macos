@@ -95,7 +95,7 @@ static const CGFloat kTitleFontSize = 13.0;
     ]];
     BOOL isDark = [matched isEqualToString:NSAppearanceNameDarkAqua]
                || [matched isEqualToString:NSAppearanceNameVibrantDark];
-    CGFloat base = isDark ? 0.08 : 0.05;
+    CGFloat base = isDark ? 0.05 : 0.05;
     CGFloat alpha = self.isHighlighted ? base * 1.8 : base;
     NSColor *color = isDark
         ? [NSColor colorWithWhite:1.0 alpha:alpha]
