@@ -7,6 +7,7 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="RLMInstanceTableViewController">
             <connections>
+                <outlet property="statusLabel" destination="sts-lb-lbl" id="sts-cn-lbl"/>
                 <outlet property="view" destination="XsG-4h-zWh" id="ve8-y2-M62"/>
             </connections>
         </customObject>
@@ -48,12 +49,40 @@
                         <autoresizingMask key="autoresizingMask"/>
                     </tableHeaderView>
                 </scrollView>
+                <customView translatesAutoresizingMaskIntoConstraints="NO" id="sts-vw-bar" userLabel="StatusBar">
+                    <rect key="frame" x="0.0" y="0.0" width="700" height="22"/>
+                    <subviews>
+                        <box boxType="separator" translatesAutoresizingMaskIntoConstraints="NO" id="sts-bx-sep" userLabel="StatusBarSeparator">
+                            <rect key="frame" x="0.0" y="21" width="700" height="1"/>
+                        </box>
+                        <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" translatesAutoresizingMaskIntoConstraints="NO" id="sts-lb-lbl" userLabel="StatusLabel">
+                            <rect key="frame" x="0.0" y="4" width="700" height="14"/>
+                            <textFieldCell key="cell" lineBreakMode="truncatingTail" sendsActionOnEndEditing="YES" selectable="YES" alignment="center" title="" drawsBackground="NO" bordered="NO" id="sts-cl-lbl">
+                                <font key="font" metaFont="smallSystem"/>
+                                <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                            </textFieldCell>
+                        </textField>
+                    </subviews>
+                    <constraints>
+                        <constraint firstItem="sts-bx-sep" firstAttribute="leading" secondItem="sts-vw-bar" secondAttribute="leading" id="sts-ct-bl"/>
+                        <constraint firstAttribute="trailing" secondItem="sts-bx-sep" secondAttribute="trailing" id="sts-ct-bt"/>
+                        <constraint firstItem="sts-bx-sep" firstAttribute="top" secondItem="sts-vw-bar" secondAttribute="top" id="sts-ct-bp"/>
+                        <constraint firstItem="sts-lb-lbl" firstAttribute="centerY" secondItem="sts-vw-bar" secondAttribute="centerY" id="sts-ct-ly"/>
+                        <constraint firstItem="sts-lb-lbl" firstAttribute="leading" secondItem="sts-vw-bar" secondAttribute="leading" constant="8" id="sts-ct-ll"/>
+                        <constraint firstAttribute="trailing" secondItem="sts-lb-lbl" secondAttribute="trailing" constant="8" id="sts-ct-lt"/>
+                    </constraints>
+                </customView>
             </subviews>
             <constraints>
                 <constraint firstAttribute="trailing" secondItem="3b6-BA-X5L" secondAttribute="trailing" id="MsK-Hb-mbv"/>
                 <constraint firstItem="3b6-BA-X5L" firstAttribute="top" secondItem="XsG-4h-zWh" secondAttribute="top" id="Pzf-27-fXl"/>
-                <constraint firstAttribute="bottom" secondItem="3b6-BA-X5L" secondAttribute="bottom" id="VzH-qT-268"/>
+                <constraint firstItem="sts-vw-bar" firstAttribute="top" secondItem="3b6-BA-X5L" secondAttribute="bottom" id="VzH-qT-268"/>
                 <constraint firstItem="3b6-BA-X5L" firstAttribute="leading" secondItem="XsG-4h-zWh" secondAttribute="leading" id="tHS-lc-oSF"/>
+                <constraint firstItem="sts-vw-bar" firstAttribute="leading" secondItem="XsG-4h-zWh" secondAttribute="leading" id="sts-ct-vl"/>
+                <constraint firstAttribute="trailing" secondItem="sts-vw-bar" secondAttribute="trailing" id="sts-ct-vt"/>
+                <constraint firstAttribute="bottom" secondItem="sts-vw-bar" secondAttribute="bottom" id="sts-ct-vb"/>
+                <constraint firstItem="sts-vw-bar" firstAttribute="height" constant="32" id="sts-ct-vh"/>
             </constraints>
         </customView>
     </objects>

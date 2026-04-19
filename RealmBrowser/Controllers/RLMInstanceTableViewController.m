@@ -53,6 +53,12 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     RLMUpdateTypeTableView
 };
 
+@interface RLMInstanceTableViewController ()
+
+@property (nonatomic, weak) IBOutlet NSTextField *statusLabel;
+
+@end
+
 @implementation RLMInstanceTableViewController {
     BOOL awake;
     BOOL linkCursorDisplaying;
@@ -98,10 +104,22 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     [self.tableView setDraggingSourceOperationMask:NSDragOperationEvery forLocal:YES];
 
     awake = YES;
+
+    [self updateStatusLabel];
 }
 
 - (void)reloadData {
     [self.tableView reloadData];
+    [self updateStatusLabel];
+}
+
+- (void)updateStatusLabel {
+    if (!self.statusLabel) {
+        return;
+    }
+    NSUInteger count = (NSUInteger)[self numberOfRowsInTableView:self.tableView];
+    NSString *word = (count == 1) ? @"item" : @"items";
+    self.statusLabel.stringValue = [NSString stringWithFormat:@"%lu %@", (unsigned long)count, word];
 }
 
 #pragma mark - Public methods - Accessors
@@ -154,11 +172,13 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     
     self.tableView.autosaveName = [NSString stringWithFormat:@"%lu:%@", realm.hash, self.displayedType.name];
     [self.tableView setAutosaveTableColumns:YES];
-    
+
     if (![autofittedColumns[self.tableView.autosaveName] isEqual:@YES]) {
         [self.realmTableView makeColumnsFitContents];
         autofittedColumns[self.tableView.autosaveName] = @YES;
     }
+
+    [self updateStatusLabel];
 }
 
 #pragma mark - NSTableView Data Source
