@@ -26,18 +26,21 @@ const CGFloat kMaxColumnWidth = 200.0;
 
 - (CGFloat)sizeThatFitsWithLimit:(BOOL)limited
 {
-    int rowsToConsider;
-    
+    int rowsToConsider = 1;
+
     switch (self.propertyType) {
         case RLMPropertyTypeBool:
         case RLMPropertyTypeData:
         case RLMPropertyTypeAny:
             rowsToConsider = 1;
             break;
-            
+
         case RLMPropertyTypeObject:
         case RLMPropertyTypeDate:
         case RLMPropertyTypeLinkingObjects:
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID:
             rowsToConsider = 3;
             break;
 

@@ -18,4 +18,4 @@
 
 #import <Foundation/Foundation.h>
 
-NSString *RLMRealHomeDirectory();
+NSString *RLMRealHomeDirectory(void);

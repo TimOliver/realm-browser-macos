@@ -27,7 +27,7 @@
 
 @end
 
-RLM_ARRAY_TYPE(RealmTestClass0)
+RLM_COLLECTION_TYPE(RealmTestClass0)
 
 @interface RealmTestClass1 : RLMObject
 

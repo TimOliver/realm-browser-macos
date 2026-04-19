@@ -80,7 +80,7 @@
     textField.translatesAutoresizingMaskIntoConstraints = NO;
     textField.bordered = NO;
     textField.drawsBackground = NO;
-    textField.alignment = NSRightTextAlignment;
+    textField.alignment = NSTextAlignmentRight;
     textField.cell.sendsActionOnEndEditing = YES;
     
     if ([NSFont respondsToSelector:@selector(monospacedDigitSystemFontOfSize:weight:)]) {

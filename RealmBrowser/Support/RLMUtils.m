@@ -19,7 +19,7 @@
 #import "RLMUtils.h"
 #include <pwd.h>
 
-NSString *RLMRealHomeDirectory() {
+NSString *RLMRealHomeDirectory(void) {
     struct passwd *pw = getpwuid(getuid());
     return @(pw->pw_dir);
 }

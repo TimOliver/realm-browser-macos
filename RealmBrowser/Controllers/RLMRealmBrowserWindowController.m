@@ -356,7 +356,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
         alert = [[NSAlert alloc] init];
 
         alert.messageText = @"Realm couldn't be opened";
-        alert.alertStyle = NSCriticalAlertStyle;
+        alert.alertStyle = NSAlertStyleCritical;
     }
 
     [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
@@ -418,7 +418,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     panel.prompt = @"Export";
 
     [panel beginSheetModalForWindow:self.window completionHandler:^(NSInteger result){
-        if (result != NSFileHandlingPanelOKButton) {
+        if (result != NSModalResponseOK) {
             return;
         }
 

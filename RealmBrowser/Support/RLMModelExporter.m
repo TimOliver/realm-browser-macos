@@ -41,11 +41,11 @@
 
 + (void)saveModelsForSchemas:(NSArray *)objectSchemas inLanguage:(RLMModelExporterLanguage)language window:(NSWindow *)window
 {
-    void(^saveMultipleFiles)(NSSavePanel *, void(^)()) = ^void(NSSavePanel *panel, void(^completionBlock)()) {
+    void(^saveMultipleFiles)(NSSavePanel *, void(^)(void)) = ^void(NSSavePanel *panel, void(^completionBlock)(void)) {
         [panel beginSheetModalForWindow:window completionHandler:^(NSInteger result) {
-            if (result == NSFileHandlingPanelOKButton) {
+            if (result == NSModalResponseOK) {
                 [panel orderOut:self];
-                completionBlock(panel);
+                completionBlock();
             }
         }];
     };
@@ -240,6 +240,12 @@
             return property.objectClassName;
         case RLMPropertyTypeLinkingObjects:
             return @"RealmList";
+        case RLMPropertyTypeObjectId:
+            return @"ObjectId";
+        case RLMPropertyTypeDecimal128:
+            return @"Decimal128";
+        case RLMPropertyTypeUUID:
+            return @"UUID";
     }
 
     return nil;
@@ -259,6 +265,9 @@
         case RLMPropertyTypeAny:
         case RLMPropertyTypeDate:
         case RLMPropertyTypeLinkingObjects:
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID:
             return YES;
     }
 
@@ -363,6 +372,12 @@
                 return [NSString stringWithFormat:@"RLMArray<%@ *><%@> *", property.objectClassName, property.objectClassName];
             case RLMPropertyTypeLinkingObjects:
                 return @"RLMLinkingObjects *";
+            case RLMPropertyTypeObjectId:
+                return @"RLMArray<RLMObjectId *><RLMObjectId> *";
+            case RLMPropertyTypeDecimal128:
+                return @"RLMArray<RLMDecimal128 *><RLMDecimal128> *";
+            case RLMPropertyTypeUUID:
+                return @"RLMArray<NSUUID *><RLMUUID> *";
         }
     }
     switch (property.type) {
@@ -409,6 +424,9 @@
         case RLMPropertyTypeDate:
         case RLMPropertyTypeObject:
         case RLMPropertyTypeLinkingObjects:
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID:
             return YES;
     }
 
@@ -478,6 +496,9 @@
             case RLMPropertyTypeObject: type = property.objectClassName;
             case RLMPropertyTypeAny: return @"/* Error! 'Any' properties are unsupported in Swift. */";
             case RLMPropertyTypeLinkingObjects: return @"";
+            case RLMPropertyTypeObjectId: type = @"ObjectId"; break;
+            case RLMPropertyTypeDecimal128: type = @"Decimal128"; break;
+            case RLMPropertyTypeUUID: type = @"UUID"; break;
         }
         return [NSString stringWithFormat:@"let %@ = List<%@%s>()", property.name, type,
                 property.optional && property.type != RLMPropertyTypeObject ? "?" : ""];
@@ -505,6 +526,12 @@
                 return objectClassProperty(@"dynamic var %@: %@?");
             case RLMPropertyTypeLinkingObjects:
                 return @"";
+            case RLMPropertyTypeObjectId:
+                return namedProperty(@"dynamic var %@: ObjectId?");
+            case RLMPropertyTypeDecimal128:
+                return namedProperty(@"dynamic var %@: Decimal128?");
+            case RLMPropertyTypeUUID:
+                return namedProperty(@"dynamic var %@: UUID?");
         }
     }
 
@@ -529,6 +556,12 @@
             return @"/* Error! 'Object' properties should always be optional. Please report this by emailing help@realm.io. */";
         case RLMPropertyTypeLinkingObjects:
             return @"";
+        case RLMPropertyTypeObjectId:
+            return namedProperty(@"dynamic var %@ = ObjectId.generate()");
+        case RLMPropertyTypeDecimal128:
+            return namedProperty(@"dynamic var %@: Decimal128 = 0");
+        case RLMPropertyTypeUUID:
+            return namedProperty(@"dynamic var %@ = UUID()");
     }
 
     return nil;
@@ -608,6 +641,15 @@
         case RLMPropertyTypeObject:
         case RLMPropertyTypeLinkingObjects:
             props[@"type"] = property.objectClassName;
+            break;
+        case RLMPropertyTypeObjectId:
+            props[@"type"] = @"objectId";
+            break;
+        case RLMPropertyTypeDecimal128:
+            props[@"type"] = @"decimal128";
+            break;
+        case RLMPropertyTypeUUID:
+            props[@"type"] = @"uuid";
             break;
     }
 
@@ -727,6 +769,15 @@
         case RLMPropertyTypeLinkingObjects:
             type = [NSString stringWithFormat:@"IQueryable<%@>", property.objectClassName];
             access = @"get;";
+            break;
+        case RLMPropertyTypeObjectId:
+            type = @"ObjectId";
+            break;
+        case RLMPropertyTypeDecimal128:
+            type = @"Decimal128";
+            break;
+        case RLMPropertyTypeUUID:
+            type = @"Guid";
             break;
     }
     if (property.array && property.type != RLMPropertyTypeLinkingObjects) {
