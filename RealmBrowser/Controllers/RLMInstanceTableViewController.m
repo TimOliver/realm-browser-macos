@@ -172,17 +172,15 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     return self.displayedType.instanceCount;
 }
 
-- (BOOL)tableView:(NSTableView *)aTableView writeRowsWithIndexes:(NSIndexSet *)rowIndexes toPasteboard:(NSPasteboard *)pboard
+- (id<NSPasteboardWriting>)tableView:(NSTableView *)aTableView pasteboardWriterForRow:(NSInteger)row
 {
     if (self.realmIsLocked || !self.displaysArray) {
-        return NO;
+        return nil;
     }
-    
-    NSData *indexSetData = [NSKeyedArchiver archivedDataWithRootObject:rowIndexes];
-    [pboard declareTypes:@[kRLMObjectType] owner:self];
-    [pboard setData:indexSetData forType:kRLMObjectType];
-    
-    return YES;
+
+    NSPasteboardItem *item = [[NSPasteboardItem alloc] init];
+    [item setString:[@(row) stringValue] forType:kRLMObjectType];
+    return item;
 }
 
 - (NSDragOperation)tableView:(NSTableView *)aTableView validateDrop:(id<NSDraggingInfo>)info proposedRow:(NSInteger)row proposedDropOperation:(NSTableViewDropOperation)operation
@@ -202,23 +200,20 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     if (self.realmIsLocked || !self.displaysArray) {
         return NO;
     }
-    
-    // Check that the dragged item is of correct type
-    NSArray *supportedTypes = @[kRLMObjectType];
-    NSPasteboard *draggingPasteboard = [info draggingPasteboard];
-    NSString *availableType = [draggingPasteboard availableTypeFromArray:supportedTypes];
-    
-    if ([availableType compare:kRLMObjectType] == NSOrderedSame) {
-        NSData *rowIndexData = [draggingPasteboard dataForType:kRLMObjectType];
-        NSIndexSet *rowIndexes = [NSKeyedUnarchiver unarchiveObjectWithData:rowIndexData];
-        
-        // Performs the move in the realm
-        [self moveRowsInRealmFrom:rowIndexes to:destination];
-        
-        return YES;
+
+    NSMutableIndexSet *rowIndexes = [NSMutableIndexSet indexSet];
+    for (NSPasteboardItem *item in info.draggingPasteboard.pasteboardItems) {
+        NSString *rowString = [item stringForType:kRLMObjectType];
+        if (rowString) {
+            [rowIndexes addIndex:(NSUInteger)rowString.integerValue];
+        }
     }
-    
-    return NO;
+    if (rowIndexes.count == 0) {
+        return NO;
+    }
+
+    [self moveRowsInRealmFrom:rowIndexes to:destination];
+    return YES;
 }
 
 #pragma mark - RLMTableView Data Source
@@ -385,7 +380,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                     boolCellView.checkBox.target = self;
                     boolCellView.checkBox.action = @selector(editedCheckBox:);
                 }
-                boolCellView.checkBox.state = [(NSNumber *)propertyValue boolValue] ? NSOnState : NSOffState;
+                boolCellView.checkBox.state = [(NSNumber *)propertyValue boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
                 [boolCellView.checkBox setEnabled:!self.realmIsLocked];
                 
                 cellView = boolCellView;
@@ -435,7 +430,10 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         case RLMPropertyTypeData:
         case RLMPropertyTypeAny:
         case RLMPropertyTypeDate:
-        case RLMPropertyTypeString: {
+        case RLMPropertyTypeString:
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID: {
             RLMBasicTableCellView *basicCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
             if (!basicCellView) {
                 basicCellView = [RLMBasicTableCellView viewWithIdentifier:reuseIdentifier];
@@ -995,9 +993,12 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         case RLMPropertyTypeBool:
         case RLMPropertyTypeData:
         case RLMPropertyTypeObject:
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID:
             break;
     }
-    
+
     if (result || optionalValue) {
         NSError *error;
 
@@ -1022,7 +1023,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     RLMClassProperty *propertyNode = displayedType.propertyColumns[propertyIndex];
     RLMObject *selectedInstance = [displayedType instanceAtIndex:row];
 
-    NSNumber *result = @((BOOL)(sender.state == NSOnState));
+    NSNumber *result = @((BOOL)(sender.state == NSControlStateValueOn));
 
     RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
     [realm beginWriteTransaction];
@@ -1153,9 +1154,9 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             NSDatePicker *datepicker = [[NSDatePicker alloc] initWithFrame:frame];
             datepicker.bordered = NO;
             datepicker.drawsBackground = NO;
-            datepicker.datePickerStyle = NSTextFieldAndStepperDatePickerStyle;
-            datepicker.datePickerElements = NSHourMinuteSecondDatePickerElementFlag
-              | NSYearMonthDayDatePickerElementFlag | NSTimeZoneDatePickerElementFlag;
+            datepicker.datePickerStyle = NSDatePickerStyleTextFieldAndStepper;
+            datepicker.datePickerElements = NSDatePickerElementFlagHourMinuteSecond
+              | NSDatePickerElementFlagYearMonthDay | NSDatePickerElementFlagTimeZone;
             datepicker.dateValue = propertyValue;
             
             item.view = datepicker;
@@ -1185,6 +1186,9 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         case RLMPropertyTypeData:
         case RLMPropertyTypeObject:
         case RLMPropertyTypeLinkingObjects:
+        case RLMPropertyTypeObjectId:
+        case RLMPropertyTypeDecimal128:
+        case RLMPropertyTypeUUID:
             // Do nothing
             break;
     }

@@ -31,7 +31,7 @@
     NSButton *button = [[NSButton alloc] initWithFrame:self.bounds];
     button.translatesAutoresizingMaskIntoConstraints = NO;
     button.title = @"";
-    button.buttonType = NSSwitchButton;
+    button.buttonType = NSButtonTypeSwitch;
     
     self.checkBox = button;
     [self addSubview:button];

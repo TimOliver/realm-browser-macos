@@ -98,7 +98,7 @@ typedef struct {
 @end
 
 
-@interface RLMTableView : NSTableView
+@interface RLMTableView : NSTableView <NSMenuItemValidation>
 
 @property (nonatomic, readonly) id<RLMTableViewDelegate> realmDelegate;
 @property (nonatomic, readonly) id<RLMTableViewDataSource> realmDataSource;

@@ -30,8 +30,8 @@
 
     NSButton *button = [[NSButton alloc] initWithFrame:NSZeroRect];
     button.translatesAutoresizingMaskIntoConstraints = NO;
-    button.buttonType = NSMomentaryPushInButton;
-    button.bezelStyle = NSInlineBezelStyle;
+    button.buttonType = NSButtonTypeMomentaryPushIn;
+    button.bezelStyle = NSBezelStyleInline;
 
     if ([button respondsToSelector:@selector(setLineBreakMode:)]) {
         button.lineBreakMode = NSLineBreakByTruncatingTail;
