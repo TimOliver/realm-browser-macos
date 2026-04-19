@@ -23,6 +23,7 @@
 
 #import "RLMBrowserConstants.h"
 #import "RLMDocumentController.h"
+#import "RLMWelcomeWindowController.h"
 
 #import "RLMTestDataGenerator.h"
 #import "RLMUtils.h"
@@ -44,7 +45,9 @@
 
 @end
 
-@implementation RLMApplicationDelegate
+@implementation RLMApplicationDelegate {
+    BOOL _openedFileOnLaunch;
+}
 
 - (void)applicationWillFinishLaunching:(NSNotification *)notification {
     // Will set sharedController
@@ -75,9 +78,14 @@
     self.dateFormatter = [[NSDateFormatter alloc] init];
     self.dateFormatter.dateStyle = NSDateFormatterMediumStyle;
     self.dateFormatter.timeStyle = NSDateFormatterShortStyle;
+
+    if (!_openedFileOnLaunch) {
+        [[RLMWelcomeWindowController sharedController] showWelcomeWindow];
+    }
 }
 
 - (BOOL)application:(NSApplication *)application openFile:(NSString *)filename {
+    _openedFileOnLaunch = YES;
     [self openFileAtURL:[NSURL fileURLWithPath:filename]];
 
     return YES;
@@ -85,6 +93,7 @@
 
 - (void)application:(NSApplication *)sender openFiles:(NSArray *)filenames
 {
+    _openedFileOnLaunch = YES;
     if (filenames.count > kMaxNumberOfFilesAtOnce) {
         NSString *message = [NSString stringWithFormat:@"Are you sure you wish to open all %lu Realm files?", (unsigned long)filenames.count];
 
@@ -310,6 +319,11 @@
 
     // Do not include empty groups
     self.groupedFileItems = [tempGroupedFileItems filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"%K.@count > 1", kItems]];
+}
+
+- (IBAction)showWelcomeWindow:(id)sender
+{
+    [[RLMWelcomeWindowController sharedController] showWelcomeWindow];
 }
 
 - (IBAction)generatedDemoDatabase:(id)sender
