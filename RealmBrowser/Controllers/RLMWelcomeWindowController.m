@@ -19,14 +19,15 @@
 #import "RLMWelcomeWindowController.h"
 #import "RLMBrowserConstants.h"
 #import "RLMTestDataGenerator.h"
+#import "RLMWelcomeActionButton.h"
 #import "TestClasses.h"
 
 static const CGFloat kWelcomeWindowWidth = 750.0;
-static const CGFloat kWelcomeWindowHeight = 460.0;
+static const CGFloat kWelcomeWindowHeight = 420.0;
 static const CGFloat kRightPaneWidth = 280.0;
 static const CGFloat kAppIconSize = 130.0;
 static const CGFloat kActionButtonWidth = 350.0;
-static const CGFloat kActionButtonHeight = 36.0;
+static const CGFloat kActionButtonHeight = 34.0;
 static const CGFloat kRecentsRowHeight = 44.0;
 
 @interface RLMWelcomeRecentsCellView : NSTableCellView
@@ -55,7 +56,7 @@ static const CGFloat kRecentsRowHeight = 44.0;
 
     self.subtitleLabel = [NSTextField labelWithString:@""];
     self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.subtitleLabel.font = [NSFont systemFontOfSize:11.0 weight:NSFontWeightRegular];
+    self.subtitleLabel.font = [NSFont systemFontOfSize:12.0 weight:NSFontWeightRegular];
     self.subtitleLabel.textColor = [NSColor secondaryLabelColor];
     self.subtitleLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
     [self addSubview:self.subtitleLabel];
@@ -76,6 +77,14 @@ static const CGFloat kRecentsRowHeight = 44.0;
     ]];
 
     return self;
+}
+
+- (void)setBackgroundStyle:(NSBackgroundStyle)backgroundStyle
+{
+    [super setBackgroundStyle:backgroundStyle];
+    BOOL emphasized = backgroundStyle == NSBackgroundStyleEmphasized;
+    self.titleLabel.textColor = emphasized ? [NSColor alternateSelectedControlTextColor] : [NSColor labelColor];
+    self.subtitleLabel.textColor = emphasized ? [NSColor alternateSelectedControlTextColor] : [NSColor secondaryLabelColor];
 }
 
 @end
@@ -116,6 +125,11 @@ static const CGFloat kRecentsRowHeight = 44.0;
     window.movableByWindowBackground = YES;
     window.restorable = NO;
     window.releasedWhenClosed = NO;
+    window.opaque = NO;
+    window.backgroundColor = [NSColor clearColor];
+    if (@available(macOS 11.0, *)) {
+        window.titlebarSeparatorStyle = NSTitlebarSeparatorStyleNone;
+    }
     [window standardWindowButton:NSWindowZoomButton].hidden = YES;
     [window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
 
@@ -137,15 +151,18 @@ static const CGFloat kRecentsRowHeight = 44.0;
 {
     NSView *contentView = self.window.contentView;
 
-    // Left pane (default material).
-    NSView *leftPane = [[NSView alloc] init];
+    // Left pane (under-page background: naturally darker than window bg in dark mode).
+    NSVisualEffectView *leftPane = [[NSVisualEffectView alloc] init];
     leftPane.translatesAutoresizingMaskIntoConstraints = NO;
+    leftPane.material = NSVisualEffectMaterialHeaderView;
+    leftPane.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    leftPane.state = NSVisualEffectStateActive;
     [contentView addSubview:leftPane];
 
-    // Right pane (sidebar blur).
+    // Right pane (denser content-background material for a more opaque sidebar look).
     NSVisualEffectView *rightPane = [[NSVisualEffectView alloc] init];
     rightPane.translatesAutoresizingMaskIntoConstraints = NO;
-    rightPane.material = NSVisualEffectMaterialSidebar;
+    rightPane.material = NSVisualEffectMaterialMenu;
     rightPane.blendingMode = NSVisualEffectBlendingModeBehindWindow;
     rightPane.state = NSVisualEffectStateActive;
     [contentView addSubview:rightPane];
@@ -189,14 +206,16 @@ static const CGFloat kRecentsRowHeight = 44.0;
     versionLabel.alignment = NSTextAlignmentCenter;
     [leftPane addSubview:versionLabel];
 
-    NSButton *openButton = [self actionButtonWithTitle:@"Open Existing Realm\u2026"
-                                            symbolName:@"folder"
-                                                action:@selector(openExistingRealm:)];
+    RLMWelcomeActionButton *openButton = [[RLMWelcomeActionButton alloc] initWithTitle:@"Open Existing Realm\u2026"
+                                                                            symbolName:@"folder"];
+    openButton.target = self;
+    openButton.action = @selector(openExistingRealm:);
     [leftPane addSubview:openButton];
 
-    NSButton *createButton = [self actionButtonWithTitle:@"Create Test Realm\u2026"
-                                              symbolName:@"doc.badge.plus"
-                                                  action:@selector(createTestRealm:)];
+    RLMWelcomeActionButton *createButton = [[RLMWelcomeActionButton alloc] initWithTitle:@"Create Test Realm\u2026"
+                                                                              symbolName:@"doc.badge.plus"];
+    createButton.target = self;
+    createButton.action = @selector(createTestRealm:);
     [leftPane addSubview:createButton];
 
     [NSLayoutConstraint activateConstraints:@[
@@ -212,7 +231,7 @@ static const CGFloat kRecentsRowHeight = 44.0;
         [versionLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:4.0],
 
         [openButton.centerXAnchor constraintEqualToAnchor:leftPane.centerXAnchor],
-        [openButton.topAnchor constraintEqualToAnchor:versionLabel.bottomAnchor constant:36.0],
+        [openButton.topAnchor constraintEqualToAnchor:versionLabel.bottomAnchor constant:38.0],
         [openButton.widthAnchor constraintEqualToConstant:kActionButtonWidth],
         [openButton.heightAnchor constraintEqualToConstant:kActionButtonHeight],
 
@@ -221,65 +240,6 @@ static const CGFloat kRecentsRowHeight = 44.0;
         [createButton.widthAnchor constraintEqualToConstant:kActionButtonWidth],
         [createButton.heightAnchor constraintEqualToConstant:kActionButtonHeight],
     ]];
-}
-
-- (NSButton *)actionButtonWithTitle:(NSString *)title symbolName:(NSString *)symbolName action:(SEL)action
-{
-    NSButton *button = [[NSButton alloc] init];
-    button.translatesAutoresizingMaskIntoConstraints = NO;
-    button.bezelStyle = NSBezelStyleRegularSquare;
-    button.bordered = YES;
-    button.target = self;
-    button.action = action;
-
-    if (@available(macOS 11.0, *)) {
-        button.bezelStyle = NSBezelStyleRegularSquare;
-    }
-
-    NSMutableAttributedString *attributed = [[NSMutableAttributedString alloc] init];
-
-    NSImage *symbol = nil;
-    if (@available(macOS 11.0, *)) {
-        symbol = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:nil];
-    }
-    if (symbol) {
-        NSImage *tinted = [symbol copy];
-        if (@available(macOS 11.0, *)) {
-            NSImageSymbolConfiguration *config = [NSImageSymbolConfiguration configurationWithPointSize:15.0
-                                                                                                  weight:NSFontWeightRegular];
-            tinted = [symbol imageWithSymbolConfiguration:config];
-        }
-        NSTextAttachment *attachment = [[NSTextAttachment alloc] init];
-        NSImage *tintedImage = tinted;
-        if (@available(macOS 11.0, *)) {
-            NSImage *colored = [NSImage imageWithSize:tinted.size flipped:NO drawingHandler:^BOOL(NSRect dstRect) {
-                [[NSColor secondaryLabelColor] set];
-                NSRectFill(dstRect);
-                [tinted drawInRect:dstRect fromRect:NSZeroRect operation:NSCompositingOperationDestinationIn fraction:1.0];
-                return YES;
-            }];
-            colored.template = NO;
-            tintedImage = colored;
-        }
-        attachment.image = tintedImage;
-        NSAttributedString *imageString = [NSAttributedString attributedStringWithAttachment:attachment];
-        [attributed appendAttributedString:imageString];
-        [attributed appendAttributedString:[[NSAttributedString alloc] initWithString:@"  "]];
-    }
-
-    NSDictionary *titleAttrs = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:14.0 weight:NSFontWeightRegular],
-        NSForegroundColorAttributeName: [NSColor labelColor],
-    };
-    [attributed appendAttributedString:[[NSAttributedString alloc] initWithString:title attributes:titleAttrs]];
-
-    NSMutableParagraphStyle *style = [[NSMutableParagraphStyle alloc] init];
-    style.alignment = NSTextAlignmentCenter;
-    [attributed addAttribute:NSParagraphStyleAttributeName value:style range:NSMakeRange(0, attributed.length)];
-
-    button.attributedTitle = attributed;
-
-    return button;
 }
 
 - (void)populateRightPane:(NSView *)rightPane
@@ -300,8 +260,10 @@ static const CGFloat kRecentsRowHeight = 44.0;
     tableView.gridStyleMask = NSTableViewGridNone;
     tableView.allowsEmptySelection = YES;
     tableView.allowsMultipleSelection = NO;
-    tableView.style = NSTableViewStylePlain;
-    tableView.selectionHighlightStyle = NSTableViewSelectionHighlightStyleRegular;
+    if (@available(macOS 11.0, *)) {
+        tableView.style = NSTableViewStyleSourceList;
+    }
+    tableView.selectionHighlightStyle = NSTableViewSelectionHighlightStyleSourceList;
     tableView.focusRingType = NSFocusRingTypeNone;
     tableView.target = self;
     tableView.doubleAction = @selector(recentDoubleClicked:);
@@ -324,10 +286,10 @@ static const CGFloat kRecentsRowHeight = 44.0;
     [rightPane addSubview:self.recentsEmptyLabel];
 
     [NSLayoutConstraint activateConstraints:@[
-        [scrollView.topAnchor constraintEqualToAnchor:rightPane.topAnchor],
-        [scrollView.bottomAnchor constraintEqualToAnchor:rightPane.bottomAnchor],
-        [scrollView.leadingAnchor constraintEqualToAnchor:rightPane.leadingAnchor],
-        [scrollView.trailingAnchor constraintEqualToAnchor:rightPane.trailingAnchor],
+        [scrollView.topAnchor constraintEqualToAnchor:rightPane.topAnchor constant:4.0],
+        [scrollView.bottomAnchor constraintEqualToAnchor:rightPane.bottomAnchor constant:-4.0],
+        [scrollView.leadingAnchor constraintEqualToAnchor:rightPane.leadingAnchor constant:4.0],
+        [scrollView.trailingAnchor constraintEqualToAnchor:rightPane.trailingAnchor constant:-4.0],
 
         [self.recentsEmptyLabel.centerXAnchor constraintEqualToAnchor:rightPane.centerXAnchor],
         [self.recentsEmptyLabel.centerYAnchor constraintEqualToAnchor:rightPane.centerYAnchor],
