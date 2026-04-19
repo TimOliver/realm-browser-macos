@@ -44,8 +44,6 @@ typedef struct {
 @protocol RLMTableViewDelegate <NSTableViewDelegate>
 
 // Asking the delegate about the state
-- (BOOL)realmIsLocked;
-
 - (BOOL)displaysArray;
 
 - (BOOL)isColumnObjectType:(NSInteger)column;
