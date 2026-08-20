@@ -69,6 +69,13 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     NSDateFormatter *dateFormatter;
     NSNumberFormatter *numberFormatter;
     RLMDescriptions *realmDescriptions;
+    RLMNotificationToken *displayedCollectionToken;
+    NSInteger pendingScrollRow;
+}
+
+- (void)dealloc
+{
+    [displayedCollectionToken invalidate];
 }
 
 - (instancetype)init
@@ -98,6 +105,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     numberFormatter.numberStyle = NSNumberFormatterDecimalStyle;
     
     linkCursorDisplaying = NO;
+    pendingScrollRow = NOT_A_ROW;
 
     realmDescriptions = [[RLMDescriptions alloc] init];
     
@@ -181,7 +189,86 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
     [self.realmTableView sizeColumnsToFitOnscreenContents];
 
+    [self observeDisplayedCollection];
+
     [self updateStatusLabel];
+}
+
+#pragma mark - Fine-grained change tracking
+
+- (void)observeDisplayedCollection
+{
+    [displayedCollectionToken invalidate];
+    displayedCollectionToken = nil;
+
+    id<RLMCollection> collection = [self.displayedType observableCollection];
+    if (collection == nil) {
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    displayedCollectionToken = [collection addNotificationBlock:^(id<RLMCollection> results, RLMCollectionChange *change, NSError *error) {
+        [weakSelf displayedCollectionDidChange:change error:error];
+    }];
+}
+
+- (void)displayedCollectionDidChange:(RLMCollectionChange *)change error:(NSError *)error
+{
+    // The initial (change == nil) notification arrives right after subscribing;
+    // navigation has already displayed that state. Invalidation of the displayed
+    // node is handled by the window controller's realm-level notification, which
+    // fires synchronously at commit — before this block can run.
+    if (error != nil || change == nil) {
+        return;
+    }
+
+    NSIndexSet *deletions = [self indexSetFromIndexes:change.deletions];
+    NSIndexSet *insertions = [self indexSetFromIndexes:change.insertions];
+    NSIndexSet *modifications = [self indexSetFromIndexes:change.modifications];
+
+    NSUInteger totalChanges = deletions.count + insertions.count + modifications.count;
+    if (totalChanges > 0) {
+        [self discardInlineEditing];
+
+        NSTableView *tableView = self.tableView;
+        if (totalChanges > 200) {
+            // Row-level bookkeeping costs more than a plain reload at this scale.
+            [self reloadData];
+        }
+        else {
+            [tableView beginUpdates];
+            [tableView removeRowsAtIndexes:deletions withAnimation:NSTableViewAnimationEffectNone];
+            [tableView insertRowsAtIndexes:insertions withAnimation:NSTableViewAnimationEffectNone];
+            [tableView reloadDataForRowIndexes:modifications
+                                 columnIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, (NSUInteger)tableView.numberOfColumns)]];
+            [tableView endUpdates];
+            [self updateStatusLabel];
+        }
+
+        // Keep the inspector in sync when the selected row's object changed.
+        NSInteger selectedRow = self.tableView.selectedRow;
+        if (selectedRow != NOT_A_ROW && [modifications containsIndex:(NSUInteger)selectedRow]) {
+            [self.parentWindowController inspectObject:[self.displayedType instanceAtIndex:selectedRow]];
+        }
+    }
+
+    // Scrolling to a freshly inserted row has to wait until the row exists.
+    if (pendingScrollRow != NOT_A_ROW) {
+        NSInteger row = pendingScrollRow;
+        pendingScrollRow = NOT_A_ROW;
+        if (row < self.tableView.numberOfRows) {
+            [self.realmTableView scrollToRow:row];
+        }
+    }
+}
+
+- (NSIndexSet *)indexSetFromIndexes:(NSArray<NSNumber *> *)indexes
+{
+    NSMutableIndexSet *indexSet = [NSMutableIndexSet indexSet];
+    for (NSNumber *index in indexes) {
+        [indexSet addIndex:index.unsignedIntegerValue];
+    }
+    return indexSet;
 }
 
 #pragma mark - NSTableView Data Source
@@ -570,8 +657,9 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
     if (newObject && [self.displayedType isKindOfClass:RLMClassNode.class]) {
         RLMClassNode *classNode = (RLMClassNode *)self.displayedType;
-        NSUInteger row = [classNode indexOfInstance:newObject];
-        [self.realmTableView scrollToRow:row];
+        // The collection notification that inserts the row arrives on the next
+        // runloop pass, so the scroll has to wait for it.
+        pendingScrollRow = (NSInteger)[classNode indexOfInstance:newObject];
     }
 }
 

@@ -99,6 +99,11 @@
     return 0; // Default implementation - should be overridden by subclasses.
 }
 
+- (id<RLMCollection>)observableCollection
+{
+    return nil; // Default implementation - should be overridden by subclasses.
+}
+
 #pragma mark - Private methods
 
 - (NSArray *)constructColumnObjectsForScheme:(RLMObjectSchema *)schema;

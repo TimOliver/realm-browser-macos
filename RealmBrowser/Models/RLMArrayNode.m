@@ -179,6 +179,11 @@
     return _isObject ? _displayedArray[index] : [RLMRowProxy proxyForArray:_displayedArray row:index];
 }
 
+- (id<RLMCollection>)observableCollection
+{
+    return _displayedArray;
+}
+
 - (id)nodeElementForColumnWithIndex:(NSInteger)index
 {
     switch (index) {

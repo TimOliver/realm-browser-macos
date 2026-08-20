@@ -39,4 +39,8 @@
 
 - (NSUInteger)indexOfInstance:(RLMObject *)instance;
 
+// The live Realm collection backing this node's rows, for fine-grained change
+// notifications. nil when the node has no observable backing store.
+- (id<RLMCollection>)observableCollection;
+
 @end

@@ -89,8 +89,13 @@
 }
 
 - (NSUInteger)indexOfInstance:(RLMObject *)instance
-{    
+{
     return [self.allObjects indexOfObject:instance];
+}
+
+- (id<RLMCollection>)observableCollection
+{
+    return self.allObjects;
 }
 
 - (NSView *)cellViewForTableView:(NSTableView *)tableView

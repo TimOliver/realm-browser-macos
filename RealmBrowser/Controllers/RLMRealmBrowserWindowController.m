@@ -588,9 +588,10 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     if (self.tableViewController.displayedType.isInvalidated) {
         [navigationStack reset];
         [self realmDidLoad];
-    } else {
-        [self.tableViewController reloadData];
     }
+    // Otherwise the table updates itself row-by-row from its collection
+    // notification (see observeDisplayedCollection); a full reload here would
+    // rebuild every visible cell to change a handful.
 }
 
 #pragma mark - Public methods - Navigation

@@ -53,6 +53,11 @@
     return displayedResults.count;
 }
 
+- (id<RLMCollection>)observableCollection
+{
+    return displayedResults;
+}
+
 - (RLMObject *)instanceAtIndex:(NSUInteger)index
 {
     return displayedResults[index];
