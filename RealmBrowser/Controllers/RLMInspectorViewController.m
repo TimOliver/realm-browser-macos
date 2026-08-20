@@ -42,6 +42,10 @@ static const CGFloat kHorizontalInset = 16.0;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, id> *stagedValues;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSControl *> *editorsByPropertyName;
 
+// Class name the current editor rows were built for. Rows are rebuilt only when
+// this changes; selecting another object of the same class just re-assigns values.
+@property (nonatomic, copy) NSString *builtSchemaClassName;
+
 @end
 
 @implementation RLMInspectorViewController
@@ -166,7 +170,17 @@ static const CGFloat kHorizontalInset = 16.0;
 {
     _inspectedObject = object;
     [self.stagedValues removeAllObjects];
-    [self rebuildEditors];
+
+    NSString *className = (object && !object.isInvalidated) ? object.objectSchema.className : nil;
+    if (className && [className isEqualToString:self.builtSchemaClassName]) {
+        [self updateEditorValues];
+    }
+    else if (className) {
+        [self rebuildEditors];
+    }
+    // With no object the stale rows stay around but hidden behind the empty state,
+    // so re-selecting an object of the same class can reuse them.
+
     [self updateHeader];
     [self updateEmptyStateVisibility];
 }
@@ -208,8 +222,10 @@ static const CGFloat kHorizontalInset = 16.0;
 
     RLMObject *object = self.inspectedObject;
     if (!object || object.isInvalidated) {
+        self.builtSchemaClassName = nil;
         return;
     }
+    self.builtSchemaClassName = object.objectSchema.className;
 
     NSString *primaryKeyName = object.objectSchema.primaryKeyProperty.name;
     for (RLMProperty *property in object.objectSchema.properties) {
@@ -290,23 +306,82 @@ static const CGFloat kHorizontalInset = 16.0;
 
 - (NSView *)editorForProperty:(RLMProperty *)property value:(id)value isPrimaryKey:(BOOL)isPrimaryKey
 {
+    NSView *editor;
     if (property.array || property.type == RLMPropertyTypeLinkingObjects || property.type == RLMPropertyTypeObject) {
-        return [self readOnlyTextFieldWithString:[self descriptionForValue:value ofProperty:property]];
+        editor = [self readOnlyTextFieldWithString:[self descriptionForValue:value ofProperty:property]];
+    }
+    else {
+        switch (property.type) {
+            case RLMPropertyTypeBool:
+                editor = [self checkboxForProperty:property value:value isPrimaryKey:isPrimaryKey];
+                break;
+            case RLMPropertyTypeInt:
+            case RLMPropertyTypeFloat:
+            case RLMPropertyTypeDouble:
+                editor = [self numberFieldForProperty:property value:value isPrimaryKey:isPrimaryKey];
+                break;
+            case RLMPropertyTypeString:
+                editor = [self stringFieldForProperty:property value:value isPrimaryKey:isPrimaryKey];
+                break;
+            case RLMPropertyTypeDate:
+                editor = [self datePickerForProperty:property value:value isPrimaryKey:isPrimaryKey];
+                break;
+            default:
+                editor = [self readOnlyTextFieldWithString:[self descriptionForValue:value ofProperty:property]];
+                break;
+        }
     }
 
-    switch (property.type) {
-        case RLMPropertyTypeBool:
-            return [self checkboxForProperty:property value:value isPrimaryKey:isPrimaryKey];
-        case RLMPropertyTypeInt:
-        case RLMPropertyTypeFloat:
-        case RLMPropertyTypeDouble:
-            return [self numberFieldForProperty:property value:value isPrimaryKey:isPrimaryKey];
-        case RLMPropertyTypeString:
-            return [self stringFieldForProperty:property value:value isPrimaryKey:isPrimaryKey];
-        case RLMPropertyTypeDate:
-            return [self datePickerForProperty:property value:value isPrimaryKey:isPrimaryKey];
-        default:
-            return [self readOnlyTextFieldWithString:[self descriptionForValue:value ofProperty:property]];
+    if ([editor isKindOfClass:[NSControl class]]) {
+        self.editorsByPropertyName[property.name] = (NSControl *)editor;
+    }
+    return editor;
+}
+
+// Push the inspected object's values into the cached editors, without touching
+// the view hierarchy.
+- (void)updateEditorValues
+{
+    RLMObject *object = self.inspectedObject;
+    if (!object || object.isInvalidated) {
+        return;
+    }
+
+    for (RLMProperty *property in object.objectSchema.properties) {
+        NSControl *editor = self.editorsByPropertyName[property.name];
+        if (!editor) {
+            continue;
+        }
+
+        id value = object[property.name];
+        if (value == NSNull.null) {
+            value = nil;
+        }
+
+        if (property.array || property.type == RLMPropertyTypeLinkingObjects || property.type == RLMPropertyTypeObject) {
+            ((NSTextField *)editor).stringValue = [self descriptionForValue:value ofProperty:property];
+            continue;
+        }
+
+        switch (property.type) {
+            case RLMPropertyTypeBool:
+                ((NSButton *)editor).state = [value boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
+                break;
+            case RLMPropertyTypeInt:
+            case RLMPropertyTypeFloat:
+            case RLMPropertyTypeDouble:
+                ((NSTextField *)editor).stringValue = value ? [NSString stringWithFormat:@"%@", value] : @"";
+                break;
+            case RLMPropertyTypeString:
+                ((NSTextField *)editor).stringValue = value ?: @"";
+                break;
+            case RLMPropertyTypeDate:
+                ((NSDatePicker *)editor).dateValue = value ?: [NSDate date];
+                break;
+            default:
+                ((NSTextField *)editor).stringValue = [self descriptionForValue:value ofProperty:property];
+                break;
+        }
     }
 }
 
@@ -325,7 +400,6 @@ static const CGFloat kHorizontalInset = 16.0;
     field.delegate = self;
     field.identifier = property.name;
     [field.cell setSendsActionOnEndEditing:YES];
-    self.editorsByPropertyName[property.name] = field;
     return field;
 }
 
@@ -351,7 +425,6 @@ static const CGFloat kHorizontalInset = 16.0;
     field.delegate = self;
     field.identifier = property.name;
     [field.cell setSendsActionOnEndEditing:YES];
-    self.editorsByPropertyName[property.name] = field;
     return field;
 }
 
@@ -361,7 +434,6 @@ static const CGFloat kHorizontalInset = 16.0;
     checkbox.state = [value boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
     checkbox.identifier = property.name;
     checkbox.enabled = !isPrimaryKey;
-    self.editorsByPropertyName[property.name] = checkbox;
     return checkbox;
 }
 
@@ -378,7 +450,6 @@ static const CGFloat kHorizontalInset = 16.0;
     picker.identifier = property.name;
     picker.enabled = !isPrimaryKey;
     [picker setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
-    self.editorsByPropertyName[property.name] = (id)picker;
     return picker;
 }
 
@@ -480,13 +551,13 @@ static const CGFloat kHorizontalInset = 16.0;
     }
 
     [self.stagedValues removeAllObjects];
-    [self rebuildEditors];
+    [self updateEditorValues];
 }
 
 - (void)discardStagedChanges
 {
     [self.stagedValues removeAllObjects];
-    [self rebuildEditors];
+    [self updateEditorValues];
 }
 
 #pragma mark - NSTextFieldDelegate (Return / Escape)
