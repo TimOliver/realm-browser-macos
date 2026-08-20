@@ -152,7 +152,7 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
         // pane minimums plus a 280pt inspector; otherwise divider drags get clamped.
         static const CGFloat kInitialInspectorWidth = 280.0;
         static const CGFloat kInitialDragHeadroom = 80.0;
-        CGFloat requiredWidth = 225 + 400 + kInitialInspectorWidth + kInitialDragHeadroom;
+        CGFloat requiredWidth = 125 + 400 + kInitialInspectorWidth + kInitialDragHeadroom;
         NSRect frame = self.window.frame;
         if (frame.size.width < requiredWidth) {
             frame.size.width = requiredWidth;
@@ -170,8 +170,8 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     NSSplitViewController *splitVC = [[NSSplitViewController alloc] init];
 
     NSSplitViewItem *sidebarItem = [NSSplitViewItem sidebarWithViewController:self.outlineViewController];
-    sidebarItem.minimumThickness = 225;
-    sidebarItem.maximumThickness = 400;
+    sidebarItem.minimumThickness = 125;
+    sidebarItem.maximumThickness = 900;
     sidebarItem.canCollapse = YES;
     [splitVC addSplitViewItem:sidebarItem];
 
