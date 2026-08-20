@@ -46,7 +46,6 @@
 NSString * const kRLMObjectType = @"RLMObjectType";
 static const NSInteger NOT_A_COLUMN = -1;
 static const NSInteger NOT_A_ROW = -1;
-static const NSInteger ARRAY_GUTTER_INDEX = -1;
 
 typedef NS_ENUM(int32_t, RLMUpdateType) {
     RLMUpdateTypeRealm,
@@ -336,11 +335,15 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         return nil;
     }
     
-    NSUInteger column = [tableView.tableColumns indexOfObject:tableColumn];
-    NSInteger propertyIndex = [self propertyIndexForColumn:column];
-    
-    // Array gutter
-    if (propertyIndex == ARRAY_GUTTER_INDEX) {
+    RLMClassProperty *classProperty = nil;
+    NSString *reuseIdentifier = nil;
+    if ([tableColumn isKindOfClass:[RLMTableColumn class]]) {
+        classProperty = [(RLMTableColumn *)tableColumn classProperty];
+        reuseIdentifier = [(RLMTableColumn *)tableColumn cellReuseIdentifier];
+    }
+
+    // Array gutter (the only column with no backing property)
+    if (classProperty == nil) {
         RLMBasicTableCellView *gutterCellView = [tableView makeViewWithIdentifier:@"GutterCell" owner:self];
 
         if (gutterCellView == nil) {
@@ -353,16 +356,12 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         return gutterCellView;
     }
     
-    RLMClassProperty *classProperty = self.displayedType.propertyColumns[propertyIndex];
     RLMProperty *property = classProperty.property;
     RLMObject *selectedInstance = [self.displayedType instanceAtIndex:rowIndex];
     id propertyValue = selectedInstance[classProperty.name];
     if (propertyValue == NSNull.null) {
         propertyValue = nil;
     }
-    NSString *reuseIdentifier = [NSString stringWithFormat:@"Property.%@.Optional.%d",
-                                 [RLMDescriptions typeNameOfProperty:property],
-                                 property.optional];
 
     if (property.array) {
         RLMBadgeTableCellView *badgeCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];

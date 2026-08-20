@@ -20,7 +20,9 @@
 
 #import "RLMRealmBrowserWindowController.h"
 
-@implementation RLMViewController
+@implementation RLMViewController {
+    NSTableView *_cachedTableView;
+}
 
 #pragma mark - NSObject overrides
 
@@ -39,7 +41,12 @@
 
 - (NSTableView *)tableView
 {
-    return [self tableViewInView:self.view];
+    // This accessor is hit for every cell AppKit creates, so cache the result
+    // rather than re-searching the view hierarchy each time.
+    if (_cachedTableView == nil) {
+        _cachedTableView = [self tableViewInView:self.view];
+    }
+    return _cachedTableView;
 }
 
 - (NSTableView *)tableViewInView:(NSView *)view

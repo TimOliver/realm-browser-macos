@@ -100,14 +100,12 @@
 
     }
     
-    [[NSOperationQueue mainQueue] addOperationWithBlock:^{
-        if (highlighted && self.textField.placeholderAttributedString != self.highlightedPlaceholderString) {
-            self.textField.placeholderAttributedString = self.highlightedPlaceholderString;
-        }
-        else if (!highlighted && self.textField.placeholderAttributedString != self.defaultPlaceholderString) {
-            self.textField.placeholderAttributedString = self.defaultPlaceholderString;
-        }
-    }];
+    if (highlighted && self.textField.placeholderAttributedString != self.highlightedPlaceholderString) {
+        self.textField.placeholderAttributedString = self.highlightedPlaceholderString;
+    }
+    else if (!highlighted && self.textField.placeholderAttributedString != self.defaultPlaceholderString) {
+        self.textField.placeholderAttributedString = self.defaultPlaceholderString;
+    }
 }
 
 @end

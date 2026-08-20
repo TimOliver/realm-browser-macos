@@ -20,11 +20,24 @@
 #import "RLMTableCellView.h"
 #import "RLMTableView.h"
 #import "RLMClassProperty.h"
+#import "RLMDescriptions.h"
 
 @implementation RLMTableColumn
 
+@synthesize cellReuseIdentifier = _cellReuseIdentifier;
+
 const NSUInteger kMaxNumberOfRowsToConsider = 50;
 const CGFloat kMaxColumnWidth = 200.0;
+
+- (NSString *)cellReuseIdentifier
+{
+    if (_cellReuseIdentifier == nil && self.classProperty != nil) {
+        RLMProperty *property = self.classProperty.property;
+        _cellReuseIdentifier = [NSString stringWithFormat:@"Property.%@.Optional.%d",
+                                [RLMDescriptions typeNameOfProperty:property], property.optional];
+    }
+    return _cellReuseIdentifier;
+}
 
 - (CGFloat)sizeThatFitsWithLimit:(BOOL)limited
 {

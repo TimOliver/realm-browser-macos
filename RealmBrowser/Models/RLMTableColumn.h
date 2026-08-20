@@ -30,6 +30,10 @@
 @property (nonatomic, strong) RLMClassProperty *classProperty;
 @property (nonatomic, copy) NSString *cachedHeaderToolTip;
 
+// Reuse identifier for this column's cell views, derived from the property type;
+// computed once here instead of being rebuilt for every cell.
+@property (nonatomic, copy, readonly) NSString *cellReuseIdentifier;
+
 - (CGFloat)sizeThatFitsWithLimit:(BOOL)limited;
 
 @end
