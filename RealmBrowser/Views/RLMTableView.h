@@ -109,6 +109,9 @@ typedef struct {
 
 - (void)setupColumnsWithType:(RLMTypeNode *)typeNode;
 
-- (void)makeColumnsFitContents;
+// Sizes every visible column to its content: the header title plus the widest
+// on-screen cell, capped. No fill-out — a sparse column stays as narrow as its
+// title regardless of window size. One-shot; called after navigation.
+- (void)sizeColumnsToFitOnscreenContents;
 
 @end

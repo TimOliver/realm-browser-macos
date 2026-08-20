@@ -68,7 +68,6 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     BOOL linkCursorDisplaying;
     NSDateFormatter *dateFormatter;
     NSNumberFormatter *numberFormatter;
-    NSMutableDictionary *autofittedColumns;
     RLMDescriptions *realmDescriptions;
 }
 
@@ -99,9 +98,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     numberFormatter.numberStyle = NSNumberFormatterDecimalStyle;
     
     linkCursorDisplaying = NO;
-    
-    autofittedColumns = [NSMutableDictionary dictionary];
-    
+
     realmDescriptions = [[RLMDescriptions alloc] init];
     
     [self.tableView registerForDraggedTypes:@[kRLMObjectType]];
@@ -182,10 +179,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     self.tableView.autosaveName = [NSString stringWithFormat:@"%lu:%@", realm.hash, self.displayedType.name];
     [self.tableView setAutosaveTableColumns:YES];
 
-    if (![autofittedColumns[self.tableView.autosaveName] isEqual:@YES]) {
-        [self.realmTableView makeColumnsFitContents];
-        autofittedColumns[self.tableView.autosaveName] = @YES;
-    }
+    [self.realmTableView sizeColumnsToFitOnscreenContents];
 
     [self updateStatusLabel];
 }

@@ -610,13 +610,27 @@ enum MenuTags {
 
 #pragma mark - Private Methods - Table Columns
 
--(void)makeColumnsFitContents
+// A single long value must not consume the whole window when deriving a
+// column's natural width from its content.
+static const CGFloat kMaxNaturalColumnWidth = 400.0;
+
+- (void)sizeColumnsToFitOnscreenContents
 {
+    // Rows currently on screen; before the first layout the visible rect can be
+    // empty, so fall back to the first screenful.
+    NSRange rowRange = [self rowsInRect:self.visibleRect];
+    if (rowRange.length == 0) {
+        rowRange = NSMakeRange(0, (NSUInteger)MIN((NSInteger)50, self.numberOfRows));
+    }
+
+    // Each column gets exactly its natural width — the header title plus the
+    // widest cell among the on-screen rows. No fill-out: a column of nils stays
+    // as narrow as its title, regardless of the window size.
     for (RLMTableColumn *column in self.tableColumns) {
         if (column.hidden) {
             continue;
         }
-        column.width = [column sizeThatFitsWithLimit:YES];
+        column.width = MIN([column widthThatFitsRows:rowRange], kMaxNaturalColumnWidth);
     }
 }
 

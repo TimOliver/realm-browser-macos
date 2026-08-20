@@ -36,4 +36,8 @@
 
 - (CGFloat)sizeThatFitsWithLimit:(BOOL)limited;
 
+// Width needed to show the header title and the given rows' content
+// untruncated. Used for the fill-out pass with the on-screen row range.
+- (CGFloat)widthThatFitsRows:(NSRange)rowRange;
+
 @end

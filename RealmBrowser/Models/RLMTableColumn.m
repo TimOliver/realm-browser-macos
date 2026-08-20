@@ -48,9 +48,83 @@ const CGFloat kMaxColumnWidth = 200.0;
     return _cellReuseIdentifier;
 }
 
++ (NSDictionary *)measurementAttributes
+{
+    static NSDictionary *textAttributes = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        textAttributes = @{NSFontAttributeName: [NSFont monospacedDigitSystemFontOfSize:12.0 weight:NSFontWeightRegular]};
+    });
+    return textAttributes;
+}
+
+// Measures the formatted strings directly. Instantiating real cell views and
+// asking each for its fittingSize forces an Auto Layout pass per cell, which is
+// far too slow to run for every column of a newly displayed class.
+- (CGFloat)contentWidthForRows:(NSRange)rowRange
+{
+    id<RLMTableViewDataSource> dataSource = (id<RLMTableViewDataSource>)self.tableView.dataSource;
+    NSInteger rowCount = [dataSource numberOfRowsInTableView:self.tableView];
+    NSDictionary *textAttributes = [RLMTableColumn measurementAttributes];
+
+    CGFloat maxWidth = 0.0;
+
+    if (self.classProperty == nil) {
+        // The array-index gutter column; size for the largest row number.
+        maxWidth = ceil([[@(MAX(rowCount, 1)) stringValue] sizeWithAttributes:textAttributes].width);
+    }
+    else if (self.propertyType == RLMPropertyTypeBool && !self.classProperty.property.array) {
+        maxWidth = 24.0; // Fixed-size checkbox
+    }
+    else {
+        NSInteger lastRow = MIN((NSInteger)NSMaxRange(rowRange), rowCount);
+        for (NSInteger rowIndex = (NSInteger)rowRange.location; rowIndex < lastRow; rowIndex++) {
+            NSString *text = [dataSource displayedStringForColumn:self.classProperty row:rowIndex];
+            maxWidth = MAX(maxWidth, ceil([text sizeWithAttributes:textAttributes].width));
+        }
+        if (self.classProperty.property.array) {
+            maxWidth += 44.0; // Count badge and its leading gap
+        }
+    }
+
+    return maxWidth;
+}
+
+// Header title, breathing room, and per-type floors applied over the raw
+// content width; `limited` additionally applies the double-click autofit cap.
+- (CGFloat)widthWithChromeForContentWidth:(CGFloat)contentWidth limited:(BOOL)limited
+{
+    NSCell *headerCell = self.headerCell;
+    NSRect rect = NSMakeRect(0, 0, INFINITY, self.tableView.rowHeight);
+    NSSize headerSize = [headerCell cellSizeForBounds:rect];
+
+    CGFloat width = MAX(contentWidth + 10.0f, headerSize.width * 1.1);
+
+    CGFloat initialFloor = 0.0;
+    switch (self.propertyType) {
+        case RLMPropertyTypeString:
+            initialFloor = 128.0;
+            break;
+        case RLMPropertyTypeInt:
+        case RLMPropertyTypeFloat:
+        case RLMPropertyTypeDouble:
+            initialFloor = 64.0;
+            break;
+        default:
+            break;
+    }
+    width = MAX(width, initialFloor);
+
+    if (limited) {
+        width = MIN(width, kMaxColumnWidth);
+    }
+
+    return width;
+}
+
 - (CGFloat)sizeThatFitsWithLimit:(BOOL)limited
 {
-    int rowsToConsider = 1;
+    NSInteger rowsToConsider = 1;
 
     switch (self.propertyType) {
         case RLMPropertyTypeBool:
@@ -72,68 +146,17 @@ const CGFloat kMaxColumnWidth = 200.0;
         case RLMPropertyTypeFloat:
         case RLMPropertyTypeDouble:
         case RLMPropertyTypeString:
-            rowsToConsider = kMaxNumberOfRowsToConsider;
+            rowsToConsider = (NSInteger)kMaxNumberOfRowsToConsider;
             break;
     }
 
-    // Measure the formatted strings directly. Instantiating real cell views and
-    // asking each for its fittingSize forces an Auto Layout pass per cell, which
-    // is far too slow to run for every column of a newly displayed class.
-    id<RLMTableViewDataSource> dataSource = (id<RLMTableViewDataSource>)self.tableView.dataSource;
-    NSInteger rowCount = [dataSource numberOfRowsInTableView:self.tableView];
+    CGFloat contentWidth = [self contentWidthForRows:NSMakeRange(0, (NSUInteger)rowsToConsider)];
+    return [self widthWithChromeForContentWidth:contentWidth limited:limited];
+}
 
-    static NSDictionary *textAttributes = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        textAttributes = @{NSFontAttributeName: [NSFont monospacedDigitSystemFontOfSize:12.0 weight:NSFontWeightRegular]};
-    });
-
-    CGFloat maxWidth = 0.0;
-
-    if (self.classProperty == nil) {
-        // The array-index gutter column; size for the largest row number.
-        maxWidth = ceil([[@(MAX(rowCount, 1)) stringValue] sizeWithAttributes:textAttributes].width);
-    }
-    else if (self.propertyType == RLMPropertyTypeBool && !self.classProperty.property.array) {
-        maxWidth = 24.0; // Fixed-size checkbox
-    }
-    else {
-        for (NSInteger rowIndex = 0; rowIndex < MIN(rowsToConsider, rowCount); rowIndex++) {
-            NSString *text = [dataSource displayedStringForColumn:self.classProperty row:rowIndex];
-            maxWidth = MAX(maxWidth, ceil([text sizeWithAttributes:textAttributes].width));
-        }
-        if (self.classProperty.property.array) {
-            maxWidth += 44.0; // Count badge and its leading gap
-        }
-    }
-
-
-    NSCell *headerCell = self.headerCell;
-    NSRect rect = NSMakeRect(0,0, INFINITY, self.tableView.rowHeight);
-    NSSize headerSize = [headerCell cellSizeForBounds:rect];
-
-    maxWidth = MAX(maxWidth + 10.0f, headerSize.width*1.1);
-
-    CGFloat initialFloor = 0.0;
-    switch (self.propertyType) {
-        case RLMPropertyTypeString:
-            initialFloor = 128.0;
-            break;
-        case RLMPropertyTypeInt:
-        case RLMPropertyTypeFloat:
-        case RLMPropertyTypeDouble:
-            initialFloor = 64.0;
-            break;
-        default:
-            break;
-    }
-    maxWidth = MAX(maxWidth, initialFloor);
-
-    if (limited) {
-        maxWidth = MIN(maxWidth, kMaxColumnWidth);
-    }
-
-    return maxWidth;
+- (CGFloat)widthThatFitsRows:(NSRange)rowRange
+{
+    return [self widthWithChromeForContentWidth:[self contentWidthForRows:rowRange] limited:NO];
 }
 
 @end
