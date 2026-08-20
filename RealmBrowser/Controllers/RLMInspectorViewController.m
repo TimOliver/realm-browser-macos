@@ -46,6 +46,12 @@ static const CGFloat kHorizontalInset = 16.0;
 // this changes; selecting another object of the same class just re-assigns values.
 @property (nonatomic, copy) NSString *builtSchemaClassName;
 
+// Editor rows are expensive to construct (NSDatePicker especially), and a class's
+// schema cannot change while its document is open, so rows are built once per
+// class and swapped back in when the user returns to that class.
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSArray<NSView *> *> *cachedRowsByClassName;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSDictionary<NSString *, NSControl *> *> *cachedEditorsByClassName;
+
 @end
 
 @implementation RLMInspectorViewController
@@ -56,6 +62,8 @@ static const CGFloat kHorizontalInset = 16.0;
     if (self) {
         _stagedValues = [NSMutableDictionary dictionary];
         _editorsByPropertyName = [NSMutableDictionary dictionary];
+        _cachedRowsByClassName = [NSMutableDictionary dictionary];
+        _cachedEditorsByClassName = [NSMutableDictionary dictionary];
     }
     return self;
 }
@@ -225,17 +233,38 @@ static const CGFloat kHorizontalInset = 16.0;
         self.builtSchemaClassName = nil;
         return;
     }
-    self.builtSchemaClassName = object.objectSchema.className;
+    NSString *className = object.objectSchema.className;
+    self.builtSchemaClassName = className;
+
+    NSArray<NSView *> *cachedRows = self.cachedRowsByClassName[className];
+    if (cachedRows) {
+        [self.editorsByPropertyName setDictionary:self.cachedEditorsByClassName[className]];
+        for (NSView *row in cachedRows) {
+            [self attachRow:row];
+        }
+        [self updateEditorValues];
+        return;
+    }
 
     NSString *primaryKeyName = object.objectSchema.primaryKeyProperty.name;
     for (RLMProperty *property in object.objectSchema.properties) {
         BOOL isPrimaryKey = [property.name isEqualToString:primaryKeyName];
         NSView *row = [self rowForProperty:property value:object[property.name] isPrimaryKey:isPrimaryKey];
         if (row) {
-            [self.fieldsStack addArrangedSubview:row];
-            [row.widthAnchor constraintEqualToAnchor:self.fieldsStack.widthAnchor constant:-(2 * kHorizontalInset)].active = YES;
+            [self attachRow:row];
         }
     }
+
+    self.cachedRowsByClassName[className] = [self.fieldsStack.arrangedSubviews copy];
+    self.cachedEditorsByClassName[className] = [self.editorsByPropertyName copy];
+}
+
+- (void)attachRow:(NSView *)row
+{
+    [self.fieldsStack addArrangedSubview:row];
+    // The stack-width constraint dies with the removal from the view hierarchy,
+    // so it is (re-)created on every attach.
+    [row.widthAnchor constraintEqualToAnchor:self.fieldsStack.widthAnchor constant:-(2 * kHorizontalInset)].active = YES;
 }
 
 - (nullable NSView *)rowForProperty:(RLMProperty *)property value:(id)value isPrimaryKey:(BOOL)isPrimaryKey
