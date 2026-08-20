@@ -377,6 +377,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
         badgeCellView.badge.hidden = NO;
         badgeCellView.badge.title = [NSString stringWithFormat:@"%lu", [(RLMArray *)propertyValue count]];
+        badgeCellView.needsLayout = YES;
         [badgeCellView.badge.cell setHighlightsBy:0];
 
         // Tooltips describe the array contents recursively, which is too expensive

@@ -28,31 +28,27 @@
         return nil;
     }
     
+    // Frame-based layout: see RLMBasicTableCellView.
     NSButton *button = [[NSButton alloc] initWithFrame:self.bounds];
-    button.translatesAutoresizingMaskIntoConstraints = NO;
     button.title = @"";
     button.buttonType = NSButtonTypeSwitch;
-    
+    [button sizeToFit];
+
     self.checkBox = button;
     [self addSubview:button];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.checkBox
-                                                     attribute:NSLayoutAttributeCenterX
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeCenterX
-                                                    multiplier:1.0
-                                                      constant:0.0]];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.checkBox
-                                                     attribute:NSLayoutAttributeCenterY
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeCenterY
-                                                    multiplier:1.0
-                                                      constant:0.0]];
 
     return self;
+}
+
+- (void)layout
+{
+    [super layout];
+
+    NSRect bounds = self.bounds;
+    NSSize size = self.checkBox.frame.size;
+    self.checkBox.frame = NSMakeRect(round(NSMidX(bounds) - (size.width / 2.0)),
+                                     round(NSMidY(bounds) - (size.height / 2.0)),
+                                     size.width, size.height);
 }
 
 @end

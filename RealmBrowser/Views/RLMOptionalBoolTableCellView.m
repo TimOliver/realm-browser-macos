@@ -36,30 +36,26 @@
         return nil;
     }
     
+    // Frame-based layout: see RLMBasicTableCellView.
     NSPopUpButton *popupButton = [[NSPopUpButton alloc] initWithFrame:self.bounds pullsDown:NO];
-    popupButton.translatesAutoresizingMaskIntoConstraints = NO;
     [popupButton addItemsWithTitles:@[@"nil", @"false", @"true"]];
     popupButton.bordered = NO;
+    [popupButton sizeToFit];
     self.popupControl = popupButton;
     [self addSubview:popupButton];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.popupControl
-                                                     attribute:NSLayoutAttributeWidth
-                                                     relatedBy:NSLayoutRelationLessThanOrEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeWidth
-                                                    multiplier:1.0
-                                                      constant:0.0]];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.popupControl
-                                                     attribute:NSLayoutAttributeCenterY
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeCenterY
-                                                    multiplier:1.0
-                                                      constant:0.0]];
-    
+
     return self;
+}
+
+- (void)layout
+{
+    [super layout];
+
+    NSRect bounds = self.bounds;
+    NSSize size = self.popupControl.frame.size;
+    self.popupControl.frame = NSMakeRect(0.0,
+                                         round(NSMidY(bounds) - (size.height / 2.0)),
+                                         MIN(size.width, bounds.size.width), size.height);
 }
 
 @end

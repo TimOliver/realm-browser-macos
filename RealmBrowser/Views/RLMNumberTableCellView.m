@@ -89,8 +89,9 @@
         return nil;
     }
     
+    // Frame-based layout: see RLMBasicTableCellView.
     RLMNumberTextField *textField = [[RLMNumberTextField alloc] initWithFrame:self.bounds];
-    textField.translatesAutoresizingMaskIntoConstraints = NO;
+    textField.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     textField.bordered = NO;
     textField.drawsBackground = NO;
     textField.alignment = NSTextAlignmentLeft;
@@ -110,39 +111,7 @@
     
     self.textField = textField;
     [self addSubview:textField];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.textField
-                                                     attribute:NSLayoutAttributeLeading
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeLeading
-                                                    multiplier:1.0
-                                                      constant:0.0]];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.textField
-                                                     attribute:NSLayoutAttributeTrailing
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeTrailing
-                                                    multiplier:1.0
-                                                      constant:0.0]];
 
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.textField
-                                                     attribute:NSLayoutAttributeTop
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeTop
-                                                    multiplier:1.0
-                                                      constant:0.0]];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.textField
-                                                     attribute:NSLayoutAttributeBottom
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeBottom
-                                                    multiplier:1.0
-                                                      constant:0.0]];
-    
     return self;
 }
 

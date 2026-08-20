@@ -31,6 +31,7 @@ const NSInteger NOT_A_COLUMN = -1;
     NSTrackingArea *trackingArea;
     RLMTableLocation currentMouseLocation;
     RLMTableLocation previousMouseLocation;
+    NSString *currentColumnSignature;
 
     NSMenuItem *clickLockItem;
 
@@ -465,9 +466,44 @@ enum MenuTags {
 
 - (void)setupColumnsWithType:(RLMTypeNode *)typeNode
 {
+    BOOL isArray = [typeNode isMemberOfClass:[RLMArrayNode class]];
+    NSArray *newPropertyColumns = typeNode.propertyColumns;
+
+    // Rebuilding NSTableView columns is one of the most expensive parts of a
+    // navigation, and most navigations (link clicks, queries, back/forward within
+    // one class) keep the exact same schema. When nothing about the columns would
+    // change, keep them — and the table's cell reuse pool — and just re-point them
+    // at the new node's properties.
+    NSMutableString *signature = [NSMutableString stringWithString:isArray ? @"#|" : @""];
+    for (RLMClassProperty *propertyColumn in newPropertyColumns) {
+        [signature appendFormat:@"%@:%ld:%d:%d|", propertyColumn.name, (long)propertyColumn.type,
+                                propertyColumn.property.optional, propertyColumn.property.array];
+    }
+
+    if ([signature isEqualToString:currentColumnSignature]) {
+        NSUInteger firstPropertyColumn = isArray ? 1 : 0;
+        for (NSUInteger index = 0; index < newPropertyColumns.count; index++) {
+            RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[firstPropertyColumn + index];
+            tableColumn.classProperty = newPropertyColumns[index];
+            tableColumn.cachedHeaderToolTip = nil; // The statistics reflect the new node's data
+        }
+        [self reloadData];
+        return;
+    }
+    currentColumnSignature = signature;
+
+    // Column mutations synchronously write table-state autosave entries — still
+    // keyed to the *outgoing* class's autosave name at this point — so suspend
+    // autosaving while rebuilding. The window controller re-enables it with the
+    // new class's name once the columns are in place.
+    self.autosaveTableColumns = NO;
+    self.autosaveName = nil;
+
+    [self beginUpdates];
     while (self.numberOfColumns > 0) {
         [self removeTableColumn:[self.tableColumns lastObject]];
     }
+    [self endUpdates];
 
     [self reloadData];
 

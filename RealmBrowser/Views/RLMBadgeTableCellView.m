@@ -28,72 +28,41 @@
         return nil;
     }
 
+    // Frame-based layout: see RLMBasicTableCellView. This cell manages the
+    // inherited text field's frame itself, so it must not autoresize to fill.
     NSButton *button = [[NSButton alloc] initWithFrame:NSZeroRect];
-    button.translatesAutoresizingMaskIntoConstraints = NO;
     button.buttonType = NSButtonTypeMomentaryPushIn;
     button.bezelStyle = NSBezelStyleInline;
 
     if ([button respondsToSelector:@selector(setLineBreakMode:)]) {
         button.lineBreakMode = NSLineBreakByTruncatingTail;
     }
-    
+
     self.badge = button;
     [self addSubview:button];
-    
-    // Remove all constraints from RLMLinkTableCellView
-    [self removeConstraints:self.constraints];
 
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.textField
-                                                     attribute:NSLayoutAttributeLeading
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeLeading
-                                                    multiplier:1
-                                                      constant:0]];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.textField
-                                                     attribute:NSLayoutAttributeTop
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeTop
-                                                    multiplier:1
-                                                      constant:0]];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.textField
-                                                     attribute:NSLayoutAttributeBottom
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeBottom
-                                                    multiplier:1
-                                                      constant:0]];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.badge
-                                                     attribute:NSLayoutAttributeLeading
-                                                     relatedBy:NSLayoutRelationGreaterThanOrEqual
-                                                        toItem:self.textField
-                                                     attribute:NSLayoutAttributeTrailing
-                                                    multiplier:1
-                                                      constant:4]];
-    
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.badge
-                                                     attribute:NSLayoutAttributeTrailing
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeTrailing
-                                                    multiplier:1
-                                                      constant:0]];
+    self.textField.autoresizingMask = NSViewNotSizable;
 
-    [self addConstraint:[NSLayoutConstraint constraintWithItem:self.badge
-                                                     attribute:NSLayoutAttributeCenterY
-                                                     relatedBy:NSLayoutRelationEqual
-                                                        toItem:self
-                                                     attribute:NSLayoutAttributeCenterY
-                                                    multiplier:1
-                                                      constant:0]];
-
-    [self.badge setContentCompressionResistancePriority:NSLayoutPriorityRequired forOrientation:NSLayoutConstraintOrientationHorizontal];
-    
     return self;
+}
+
+- (void)layout
+{
+    [super layout];
+
+    // The badge hugs the trailing edge at its natural size (which tracks its
+    // title, so the controller marks the cell needsLayout after changing it);
+    // the text field fills the rest.
+    [self.badge sizeToFit];
+
+    NSRect bounds = self.bounds;
+    NSSize badgeSize = self.badge.frame.size;
+    self.badge.frame = NSMakeRect(NSMaxX(bounds) - badgeSize.width,
+                                  round(NSMidY(bounds) - (badgeSize.height / 2.0)),
+                                  badgeSize.width, badgeSize.height);
+    self.textField.frame = NSMakeRect(0.0, 0.0,
+                                      MAX(0.0, bounds.size.width - badgeSize.width - 4.0),
+                                      bounds.size.height);
 }
 
 @end
