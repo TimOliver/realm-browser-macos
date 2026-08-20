@@ -38,6 +38,10 @@ typedef struct {
 
 -(NSString *)headerToolTipForColumn:(RLMClassProperty *)propertyColumn;
 
+// The formatted string a cell in this column/row would display; used to measure
+// column widths without instantiating cell views.
+-(NSString *)displayedStringForColumn:(RLMClassProperty *)propertyColumn row:(NSInteger)rowIndex;
+
 @end
 
 

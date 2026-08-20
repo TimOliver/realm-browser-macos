@@ -18,6 +18,8 @@
 
 #import "RLMTableColumn.h"
 #import "RLMTableCellView.h"
+#import "RLMTableView.h"
+#import "RLMClassProperty.h"
 
 @implementation RLMTableColumn
 
@@ -52,19 +54,38 @@ const CGFloat kMaxColumnWidth = 200.0;
             break;
     }
 
-    NSInteger columnIndex = [self.tableView.tableColumns indexOfObject:self];
+    // Measure the formatted strings directly. Instantiating real cell views and
+    // asking each for its fittingSize forces an Auto Layout pass per cell, which
+    // is far too slow to run for every column of a newly displayed class.
+    id<RLMTableViewDataSource> dataSource = (id<RLMTableViewDataSource>)self.tableView.dataSource;
+    NSInteger rowCount = [dataSource numberOfRowsInTableView:self.tableView];
 
-    if (self.tableView.numberOfRows == 0) {
-        [self.tableView reloadData];
-    }
-    
+    static NSDictionary *textAttributes = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        textAttributes = @{NSFontAttributeName: [NSFont monospacedDigitSystemFontOfSize:12.0 weight:NSFontWeightRegular]};
+    });
+
     CGFloat maxWidth = 0.0;
 
-    for (NSInteger rowIndex = 0; rowIndex < MIN(rowsToConsider, self.tableView.numberOfRows); rowIndex++) {
-        RLMTableCellView *tableCellView = [self.tableView viewAtColumn:columnIndex row:rowIndex makeIfNecessary:YES];
-        maxWidth = MAX(maxWidth, tableCellView.fittingSize.width);
+    if (self.classProperty == nil) {
+        // The array-index gutter column; size for the largest row number.
+        maxWidth = ceil([[@(MAX(rowCount, 1)) stringValue] sizeWithAttributes:textAttributes].width);
     }
-    
+    else if (self.propertyType == RLMPropertyTypeBool && !self.classProperty.property.array) {
+        maxWidth = 24.0; // Fixed-size checkbox
+    }
+    else {
+        for (NSInteger rowIndex = 0; rowIndex < MIN(rowsToConsider, rowCount); rowIndex++) {
+            NSString *text = [dataSource displayedStringForColumn:self.classProperty row:rowIndex];
+            maxWidth = MAX(maxWidth, ceil([text sizeWithAttributes:textAttributes].width));
+        }
+        if (self.classProperty.property.array) {
+            maxWidth += 44.0; // Count badge and its leading gap
+        }
+    }
+
+
     NSCell *headerCell = self.headerCell;
     NSRect rect = NSMakeRect(0,0, INFINITY, self.tableView.rowHeight);
     NSSize headerSize = [headerCell cellSizeForBounds:rect];

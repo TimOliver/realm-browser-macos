@@ -293,6 +293,16 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     }
 }
 
+-(NSString *)displayedStringForColumn:(RLMClassProperty *)propertyColumn row:(NSInteger)rowIndex
+{
+    RLMObject *instance = [self.displayedType instanceAtIndex:rowIndex];
+    id propertyValue = instance[propertyColumn.name];
+    if (propertyValue == NSNull.null) {
+        propertyValue = nil;
+    }
+    return [realmDescriptions printablePropertyValue:propertyValue ofType:propertyColumn.property];
+}
+
 #pragma mark - NSTableView Delegate
 
 -(CGFloat)tableView:(NSTableView *)tableView sizeToFitWidthOfColumn:(NSInteger)column
