@@ -370,7 +370,10 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         badgeCellView.badge.title = [NSString stringWithFormat:@"%lu", [(RLMArray *)propertyValue count]];
         [badgeCellView.badge.cell setHighlightsBy:0];
 
-        badgeCellView.toolTip = [realmDescriptions tooltipForPropertyValue:propertyValue ofType:classProperty.property];
+        // Tooltips describe the array contents recursively, which is too expensive
+        // to do per-cell while scrolling; they are set on hover instead
+        // (see mouseDidEnterCellAtLocation:). Clear any value left by cell reuse.
+        badgeCellView.toolTip = nil;
         return badgeCellView;
     }
 
@@ -472,7 +475,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         [(id)cellView setOptional:property.optional];
     }
 
-    cellView.toolTip = [realmDescriptions tooltipForPropertyValue:propertyValue ofType:classProperty.property];
+    // Set on hover instead (see mouseDidEnterCellAtLocation:); clear reuse leftovers.
+    cellView.toolTip = nil;
     return cellView;
 }
 
@@ -941,6 +945,14 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         
     RLMObject *selectedInstance = [self.displayedType instanceAtIndex:location.row];
     id propertyValue = selectedInstance[propertyNode.name];
+
+    // Tooltips are built here, for just the hovered cell, rather than for every
+    // cell in viewForTableColumn: — describing links/arrays walks the linked
+    // objects' properties and is far too expensive to run per cell on scroll.
+    NSView *hoveredCellView = [self.tableView viewAtColumn:location.column row:location.row makeIfNecessary:NO];
+    if (hoveredCellView) {
+        hoveredCellView.toolTip = [realmDescriptions tooltipForPropertyValue:propertyValue ofType:propertyNode.property];
+    }
 
     if (!propertyValue) {
         [self disableLinkCursor];
