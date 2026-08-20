@@ -20,47 +20,60 @@
 
 @interface RLMNumberTextField : NSTextField
 
-@property (nonatomic, strong) NSNumberFormatter *numberFormatter;
-
 @end
 
 @implementation RLMNumberTextField
 
+// Creating an NSNumberFormatter is expensive (it performs ICU locale setup), so
+// all number fields share two immutable instances rather than building their own.
++ (NSNumberFormatter *)displayFormatter {
+    static NSNumberFormatter *formatter;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        formatter = [[NSNumberFormatter alloc] init];
+        formatter.numberStyle = NSNumberFormatterDecimalStyle;
+        formatter.maximumFractionDigits = UINT16_MAX;
+    });
+    return formatter;
+}
+
++ (NSNumberFormatter *)editingFormatter {
+    static NSNumberFormatter *formatter;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        formatter = [[NSNumberFormatter alloc] init];
+        formatter.numberStyle = NSNumberFormatterDecimalStyle;
+        formatter.maximumFractionDigits = UINT16_MAX;
+        formatter.hasThousandSeparators = NO;
+    });
+    return formatter;
+}
+
 - (instancetype)initWithFrame:(NSRect)frameRect {
     if (self = [super initWithFrame:frameRect]) {
-        [self setupNumberFormatter];
+        self.formatter = [RLMNumberTextField displayFormatter];
     }
-    
+
     return self;
 }
 
 - (instancetype)initWithCoder:(NSCoder *)coder {
     if (self = [super initWithCoder:coder]) {
-        [self setupNumberFormatter];
+        self.formatter = [RLMNumberTextField displayFormatter];
     }
-    
+
     return self;
 }
 
-- (void)setupNumberFormatter {
-    [super awakeFromNib];
-    
-    self.numberFormatter = [[NSNumberFormatter alloc] init];
-    self.numberFormatter.numberStyle = NSNumberFormatterDecimalStyle;
-    self.numberFormatter.maximumFractionDigits = UINT16_MAX;
-    
-    self.formatter = self.numberFormatter;
-}
-
 -(BOOL)becomeFirstResponder {
-    self.numberFormatter.hasThousandSeparators = NO;
-    
+    self.formatter = [RLMNumberTextField editingFormatter];
+
     return [super becomeFirstResponder];
 }
 
 - (BOOL)resignFirstResponder {
-    self.numberFormatter.hasThousandSeparators = YES;
-    
+    self.formatter = [RLMNumberTextField displayFormatter];
+
     return [super resignFirstResponder];
 }
 
