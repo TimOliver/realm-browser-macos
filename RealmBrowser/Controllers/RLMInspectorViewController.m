@@ -92,6 +92,12 @@ static const CGFloat kHorizontalInset = 16.0;
     self.headerSubtitleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     self.headerSubtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
+    // Let the labels truncate rather than push the header wider than the panel.
+    [self.headerTitleLabel setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow
+                                                    forOrientation:NSLayoutConstraintOrientationHorizontal];
+    [self.headerSubtitleLabel setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow
+                                                       forOrientation:NSLayoutConstraintOrientationHorizontal];
+
     NSStackView *titleStack = [NSStackView stackViewWithViews:@[self.headerTitleLabel, self.headerSubtitleLabel]];
     titleStack.orientation = NSUserInterfaceLayoutOrientationVertical;
     titleStack.alignment = NSLayoutAttributeLeading;
@@ -129,6 +135,7 @@ static const CGFloat kHorizontalInset = 16.0;
         [self.headerStack.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
         [self.headerSeparator.leadingAnchor constraintEqualToAnchor:self.headerStack.leadingAnchor],
         [self.headerSeparator.trailingAnchor constraintEqualToAnchor:self.headerStack.trailingAnchor],
+        [titleStack.widthAnchor constraintEqualToAnchor:self.headerStack.widthAnchor],
 
         // Scroll view starts right below the header stack (which collapses to 0 when hidden).
         [self.scrollView.topAnchor constraintEqualToAnchor:self.headerStack.bottomAnchor],
