@@ -62,13 +62,19 @@ const NSInteger NOT_A_COLUMN = -1;
     
     currentMouseLocation = RLMTableLocationUndefined;
     previousMouseLocation = RLMTableLocationUndefined;
-    
+
     [self createContextMenuItems];
     self.allowsColumnReordering = NO;
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(columnDidResize:)
+                                                 name:NSTableViewColumnDidResizeNotification
+                                               object:self];
 }
 
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self removeTrackingArea:trackingArea];
 }
 
@@ -502,14 +508,53 @@ enum MenuTags {
         tableColumn.minWidth = 26.0;
         tableColumn.width = initialWidth;
 
-        tableColumn.headerToolTip = [self.realmDataSource headerToolTipForColumn:propertyColumn];
+        // The statistics tooltip requires full-table aggregate queries, so it is
+        // computed lazily on first hover (see stringForToolTip:) rather than here.
+        tableColumn.classProperty = propertyColumn;
         [self addTableColumn:tableColumn];
     }
-    
+
     [self endUpdates];
+
+    [self updateHeaderToolTipRects];
 
     // FIXME: force layout subview to change header view height
     [self.enclosingScrollView tile];
+}
+
+#pragma mark - Private Methods - Header tooltips
+
+- (void)updateHeaderToolTipRects
+{
+    NSTableHeaderView *headerView = self.headerView;
+    [headerView removeAllToolTips];
+    for (NSInteger index = 0; index < self.numberOfColumns; index++) {
+        [headerView addToolTipRect:[headerView headerRectOfColumn:index] owner:self userData:NULL];
+    }
+}
+
+- (void)columnDidResize:(NSNotification *)notification
+{
+    [self updateHeaderToolTipRects];
+}
+
+- (NSString *)view:(NSView *)view stringForToolTip:(NSToolTipTag)tag point:(NSPoint)point userData:(void *)data
+{
+    NSInteger columnIndex = [self.headerView columnAtPoint:point];
+    if (columnIndex < 0 || columnIndex >= self.numberOfColumns) {
+        return nil;
+    }
+
+    NSTableColumn *column = self.tableColumns[columnIndex];
+    if (![column isKindOfClass:[RLMTableColumn class]]) {
+        return column.headerToolTip;
+    }
+
+    RLMTableColumn *realmColumn = (RLMTableColumn *)column;
+    if (realmColumn.classProperty && realmColumn.cachedHeaderToolTip == nil) {
+        realmColumn.cachedHeaderToolTip = [self.realmDataSource headerToolTipForColumn:realmColumn.classProperty] ?: @"";
+    }
+    return realmColumn.cachedHeaderToolTip.length > 0 ? realmColumn.cachedHeaderToolTip : column.headerToolTip;
 }
 
 #pragma mark - Private Methods - Table Columns

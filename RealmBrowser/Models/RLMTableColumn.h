@@ -19,9 +19,16 @@
 @import Cocoa;
 #import "RLMTypeNode.h"
 
+@class RLMClassProperty;
+
 @interface RLMTableColumn : NSTableColumn
 
 @property (nonatomic) RLMPropertyType propertyType;
+
+// Set when the column represents a schema property; used to compute the
+// header statistics tooltip lazily on first hover rather than at column setup.
+@property (nonatomic, strong) RLMClassProperty *classProperty;
+@property (nonatomic, copy) NSString *cachedHeaderToolTip;
 
 - (CGFloat)sizeThatFitsWithLimit:(BOOL)limited;
 
