@@ -40,6 +40,18 @@
     return [super initWithNibName:NSStringFromClass(self.class) bundle:nil];
 }
 
+- (void)viewDidLayout
+{
+    [super viewDidLayout];
+
+    // The xib's lastColumnOnly autoresizing doesn't reliably keep the single
+    // column matched to the sidebar width, which strands the count capsules
+    // (pinned to the column's trailing edge) mid-sidebar or clips them off the
+    // right. Refit on every layout pass; sizeLastColumnToFit accounts for the
+    // source-list style's row insets, and is a no-op once the column fits.
+    [self.classesOutlineView sizeLastColumnToFit];
+}
+
 #pragma mark - RLMViewController overrides
 
 -(void)realmDidLoad
