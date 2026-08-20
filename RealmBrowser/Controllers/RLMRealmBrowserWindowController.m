@@ -188,6 +188,11 @@ NSString * const kRealmKeyOutlineWidthForRealm = @"OutlineWidthForRealm:%@";
     inspectorItem.canCollapse = YES;
     [splitVC addSplitViewItem:inspectorItem];
 
+    // Layer-back the whole content hierarchy: scrolling then translates layers
+    // instead of redrawing strips, and the table cells' canDrawSubviewsIntoLayer
+    // opt-in actually takes effect.
+    splitVC.view.wantsLayer = YES;
+
     self.window.contentViewController = splitVC;
     self.splitView = splitVC.splitView;
 }

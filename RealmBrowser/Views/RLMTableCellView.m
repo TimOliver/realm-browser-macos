@@ -17,15 +17,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #import "RLMTableCellView.h"
-#import "RLMBrowserConstants.h"
-#import "NSColor+ByteSizeFactory.h"
-
-@interface RLMTableCellView ()
-
-@property (nonatomic, strong) NSAttributedString *highlightedPlaceholderString;
-@property (nonatomic, strong) NSAttributedString *defaultPlaceholderString;
-
-@end
 
 @implementation RLMTableCellView
 
@@ -33,7 +24,7 @@
 {
     RLMTableCellView *view = [[self alloc] initWithFrame:NSZeroRect];
     view.identifier = identifier;
-    
+
     return view;
 }
 
@@ -43,7 +34,7 @@
         self.canDrawSubviewsIntoLayer = YES;
         self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
     }
-    
+
     return self;
 }
 
@@ -53,19 +44,56 @@
         self.canDrawSubviewsIntoLayer = YES;
         self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
     }
-    
+
     return self;
 }
 
-- (NSSize)intrinsicContentSize
+#pragma mark - Drawn text
+
+// Text cells draw their string directly rather than hosting an NSTextField —
+// the field's cell machinery, field-editor readiness, and text layer dominated
+// the profile when populating and scrolling rows. Editing goes through the
+// controller's shared overlay editor instead.
+
++ (NSFont *)cellTextFont
 {
-    // NSTextField's intrinsic width is always -1 for editable text fields. Temporarily disable editability so we can
-    // compute the intrinsic size.
-    BOOL editable = self.textField.editable;
-    self.textField.editable = NO;
-    NSSize size = self.textField.intrinsicContentSize;
-    self.textField.editable = editable;
-    return size;
+    static NSFont *font;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        font = [NSFont monospacedDigitSystemFontOfSize:12.0 weight:NSFontWeightRegular];
+    });
+    return font;
+}
+
++ (NSParagraphStyle *)cellTextParagraphStyle
+{
+    static NSParagraphStyle *style;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSMutableParagraphStyle *mutableStyle = [[NSMutableParagraphStyle alloc] init];
+        mutableStyle.lineBreakMode = NSLineBreakByTruncatingTail;
+        style = [mutableStyle copy];
+    });
+    return style;
+}
+
++ (CGFloat)cellTextHeight
+{
+    static CGFloat height;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        height = ceil([@"Ag" sizeWithAttributes:@{NSFontAttributeName: [self cellTextFont]}].height);
+    });
+    return height;
+}
+
+- (void)setText:(NSString *)text
+{
+    if (text == _text || [text isEqualToString:_text]) {
+        return;
+    }
+    _text = [text copy];
+    [self setNeedsDisplay:YES];
 }
 
 - (void)setOptional:(BOOL)optional
@@ -73,39 +101,64 @@
     if (optional == _optional) {
         return;
     }
-    
     _optional = optional;
-
-    [self configurePlaceholderStringHighlighted:NO];
+    [self setNeedsDisplay:YES];
 }
 
 - (void)setBackgroundStyle:(NSBackgroundStyle)backgroundStyle
 {
     [super setBackgroundStyle:backgroundStyle];
-    [self configurePlaceholderStringHighlighted:(backgroundStyle == NSBackgroundStyleEmphasized)];
+    [self setNeedsDisplay:YES];
 }
 
-- (void)configurePlaceholderStringHighlighted:(BOOL)highlighted
+- (NSDictionary *)textAttributes
 {
-    if (!_optional || ![self.textField respondsToSelector:@selector(placeholderAttributedString)]) {
+    NSColor *color = (self.backgroundStyle == NSBackgroundStyleEmphasized) ? NSColor.alternateSelectedControlTextColor
+                                                                           : NSColor.labelColor;
+    return @{NSFontAttributeName: [RLMTableCellView cellTextFont],
+             NSParagraphStyleAttributeName: [RLMTableCellView cellTextParagraphStyle],
+             NSForegroundColorAttributeName: color};
+}
+
+- (NSDictionary *)placeholderTextAttributes
+{
+    NSColor *color = (self.backgroundStyle == NSBackgroundStyleEmphasized) ? NSColor.alternateSelectedControlTextColor
+                                                                           : NSColor.placeholderTextColor;
+    return @{NSFontAttributeName: [RLMTableCellView cellTextFont],
+             NSParagraphStyleAttributeName: [RLMTableCellView cellTextParagraphStyle],
+             NSForegroundColorAttributeName: color};
+}
+
+- (NSRect)textDrawingRect
+{
+    return self.bounds;
+}
+
+- (void)drawRect:(NSRect)dirtyRect
+{
+    [super drawRect:dirtyRect];
+
+    NSString *text = self.text;
+    if (text == nil) {
         return;
     }
 
-    if (self.highlightedPlaceholderString == nil || self.defaultPlaceholderString == nil) {
-        NSDictionary *highlightedAttributes = @{NSForegroundColorAttributeName:[NSColor alternateSelectedControlTextColor]};
-        self.highlightedPlaceholderString = [[NSAttributedString alloc] initWithString:@"nil" attributes:highlightedAttributes];
+    NSDictionary *attributes;
+    if (text.length == 0) {
+        if (!self.optional) {
+            return;
+        }
+        text = @"nil";
+        attributes = [self placeholderTextAttributes];
+    }
+    else {
+        attributes = [self textAttributes];
+    }
 
-        NSDictionary *defaultAttributes = @{NSForegroundColorAttributeName:[NSColor placeholderTextColor]};
-        self.defaultPlaceholderString = [[NSAttributedString alloc] initWithString:@"nil" attributes:defaultAttributes];
-
-    }
-    
-    if (highlighted && self.textField.placeholderAttributedString != self.highlightedPlaceholderString) {
-        self.textField.placeholderAttributedString = self.highlightedPlaceholderString;
-    }
-    else if (!highlighted && self.textField.placeholderAttributedString != self.defaultPlaceholderString) {
-        self.textField.placeholderAttributedString = self.defaultPlaceholderString;
-    }
+    NSRect rect = [self textDrawingRect];
+    CGFloat height = [RLMTableCellView cellTextHeight];
+    rect = NSMakeRect(NSMinX(rect), round(NSMidY(rect) - (height / 2.0)), NSWidth(rect), height);
+    [text drawInRect:rect withAttributes:attributes];
 }
 
 @end

@@ -52,9 +52,14 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     RLMUpdateTypeTableView
 };
 
-@interface RLMInstanceTableViewController ()
+@interface RLMInstanceTableViewController () <NSTextFieldDelegate>
 
 @property (nonatomic, weak) IBOutlet NSTextField *statusLabel;
+
+// Shared overlay editor for inline edits (the drawn-text cells host no fields).
+@property (nonatomic, strong) NSTextField *inlineEditorField;
+@property (nonatomic) BOOL inlineEditingActive;
+@property (nonatomic) BOOL inlineEditingCancelled;
 
 @end
 
@@ -108,6 +113,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 }
 
 - (void)reloadData {
+    // A reload rebinds every cell, so an in-flight inline edit can't survive it.
+    [self discardInlineEditing];
     [self.tableView reloadData];
     [self updateStatusLabel];
 }
@@ -133,7 +140,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 - (void)performUpdateUsingState:(RLMNavigationState *)newState oldState:(RLMNavigationState *)oldState
 {
     [super performUpdateUsingState:newState oldState:oldState];
-    
+
+    [self discardInlineEditing];
     [self.tableView setAutosaveTableColumns:NO];
     
     RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
@@ -189,8 +197,22 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     if (tableView != self.tableView) {
         return 0;
     }
-    
+
     return self.displayedType.instanceCount;
+}
+
+- (NSTableRowView *)tableView:(NSTableView *)tableView rowViewForRow:(NSInteger)row
+{
+    // Row views only participate in the reuse queue when supplied with an
+    // identifier; without this the table allocates a fresh NSTableRowView per
+    // row on every reload, which is one of the largest scroll/reload costs.
+    static NSString * const kRowViewIdentifier = @"RLMTableRowView";
+    NSTableRowView *rowView = [tableView makeViewWithIdentifier:kRowViewIdentifier owner:self];
+    if (rowView == nil) {
+        rowView = [[NSTableRowView alloc] initWithFrame:NSZeroRect];
+        rowView.identifier = kRowViewIdentifier;
+    }
+    return rowView;
 }
 
 - (id<NSPasteboardWriting>)tableView:(NSTableView *)aTableView pasteboardWriterForRow:(NSInteger)row
@@ -350,8 +372,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             gutterCellView = [RLMBasicTableCellView viewWithIdentifier:@"GutterCell"];
         }
 
-        gutterCellView.textField.stringValue = [@(rowIndex) stringValue];
-        gutterCellView.textField.editable = NO;
+        gutterCellView.text = [@(rowIndex) stringValue];
 
         return gutterCellView;
     }
@@ -369,11 +390,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             badgeCellView = [RLMBadgeTableCellView viewWithIdentifier:reuseIdentifier];
             badgeCellView.optional = YES;
         }
-        NSString *string = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-        NSDictionary *attr = @{NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle)};
-        badgeCellView.textField.attributedStringValue = [[NSAttributedString alloc] initWithString:string attributes:attr];
-
-        badgeCellView.textField.editable = NO;
+        badgeCellView.text = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
 
         badgeCellView.badge.hidden = NO;
         badgeCellView.badge.title = [NSString stringWithFormat:@"%lu", [(RLMArray *)propertyValue count]];
@@ -434,10 +451,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                 numberCellView = [RLMNumberTableCellView viewWithIdentifier:reuseIdentifier];
             }
 
-            numberCellView.textField.objectValue = propertyValue;
-            numberCellView.textField.editable = ![self isPrimaryKeyProperty:property ofInstance:selectedInstance];
-            numberCellView.textField.target = self;
-            numberCellView.textField.action = @selector(cellTextFieldEdited:);
+            numberCellView.text = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
 
             cellView = numberCellView;
 
@@ -450,11 +464,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                 linkCellView = [RLMLinkTableCellView viewWithIdentifier:reuseIdentifier];
             }
 
-            NSString *string = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-            NSDictionary *attr = @{NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle)};
-            linkCellView.textField.attributedStringValue = [[NSAttributedString alloc] initWithString:string attributes:attr];
-
-            linkCellView.textField.editable = NO;
+            linkCellView.text = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
 
             cellView = linkCellView;
 
@@ -474,13 +484,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                 basicCellView = [RLMBasicTableCellView viewWithIdentifier:reuseIdentifier];
             }
 
-            basicCellView.textField.stringValue = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-            // Of the types sharing this cell, only strings round-trip losslessly
-            // through their displayed text, so only they edit inline.
-            basicCellView.textField.editable = (classProperty.type == RLMPropertyTypeString
-                                                && ![self isPrimaryKeyProperty:property ofInstance:selectedInstance]);
-            basicCellView.textField.target = self;
-            basicCellView.textField.action = @selector(cellTextFieldEdited:);
+            basicCellView.text = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
 
             cellView = basicCellView;
 
@@ -1059,16 +1063,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
 - (void)userDoubleClicked:(NSTableView *)sender
 {
-    NSInteger row = self.tableView.clickedRow;
-    NSInteger column = self.tableView.clickedColumn;
-    if (row == NOT_A_ROW || column == NOT_A_COLUMN) {
-        return;
-    }
-
-    NSTableCellView *cellView = (NSTableCellView *)[self.tableView viewAtColumn:column row:row makeIfNecessary:NO];
-    if ([cellView isKindOfClass:[NSTableCellView class]] && cellView.textField.editable) {
-        [self.view.window makeFirstResponder:cellView.textField];
-    }
+    [self beginInlineEditingAtRow:self.tableView.clickedRow column:self.tableView.clickedColumn];
 }
 
 #pragma mark - Inline editing
@@ -1083,11 +1078,143 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     return [property.name isEqualToString:instance.objectSchema.primaryKeyProperty.name];
 }
 
-- (void)cellTextFieldEdited:(NSTextField *)sender
+- (BOOL)canInlineEditProperty:(RLMClassProperty *)classProperty ofInstance:(RLMObject *)instance
 {
+    if (classProperty == nil || classProperty.property.array) {
+        return NO;
+    }
+    switch (classProperty.type) {
+        case RLMPropertyTypeInt:
+        case RLMPropertyTypeFloat:
+        case RLMPropertyTypeDouble:
+        case RLMPropertyTypeString:
+            break;
+        default:
+            return NO;
+    }
+    return ![self isPrimaryKeyProperty:classProperty.property ofInstance:instance];
+}
+
+// The drawn-text cells host no text fields, so one shared editor overlays the
+// cell for the duration of an edit.
+- (NSTextField *)inlineEditorField
+{
+    if (_inlineEditorField == nil) {
+        NSTextField *field = [[NSTextField alloc] initWithFrame:NSZeroRect];
+        field.font = [NSFont monospacedDigitSystemFontOfSize:12.0 weight:NSFontWeightRegular];
+        field.bezeled = NO;
+        field.bordered = NO;
+        field.drawsBackground = YES;
+        field.backgroundColor = NSColor.textBackgroundColor;
+        [(NSTextFieldCell *)field.cell setScrollable:YES];
+        [(NSTextFieldCell *)field.cell setUsesSingleLineMode:YES];
+        field.cell.sendsActionOnEndEditing = YES;
+        field.target = self;
+        field.action = @selector(inlineEditorAction:);
+        field.delegate = self;
+        _inlineEditorField = field;
+    }
+    return _inlineEditorField;
+}
+
++ (NSNumberFormatter *)inlineEditingNumberFormatter
+{
+    static NSNumberFormatter *formatter;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        formatter = [[NSNumberFormatter alloc] init];
+        formatter.numberStyle = NSNumberFormatterDecimalStyle;
+        formatter.maximumFractionDigits = UINT16_MAX;
+        formatter.hasThousandSeparators = NO;
+    });
+    return formatter;
+}
+
+- (void)beginInlineEditingAtRow:(NSInteger)row column:(NSInteger)column
+{
+    if (row == NOT_A_ROW || column == NOT_A_COLUMN) {
+        return;
+    }
+
+    NSInteger propertyIndex = [self propertyIndexForColumn:column];
+    if (propertyIndex < 0 || propertyIndex >= (NSInteger)self.displayedType.propertyColumns.count) {
+        return;
+    }
+
+    RLMClassProperty *classProperty = self.displayedType.propertyColumns[propertyIndex];
+    RLMObject *instance = [self.displayedType instanceAtIndex:row];
+    if (![self canInlineEditProperty:classProperty ofInstance:instance]) {
+        return;
+    }
+
+    NSView *cellView = [self.tableView viewAtColumn:column row:row makeIfNecessary:NO];
+    if (cellView == nil) {
+        return;
+    }
+
+    [self discardInlineEditing];
+
+    id value = instance[classProperty.name];
+    if (value == NSNull.null) {
+        value = nil;
+    }
+
+    NSTextField *field = self.inlineEditorField;
+    if (classProperty.type == RLMPropertyTypeString) {
+        field.formatter = nil;
+        field.stringValue = value ?: @"";
+    }
+    else {
+        field.formatter = [self.class inlineEditingNumberFormatter];
+        field.objectValue = value;
+    }
+
+    field.frame = cellView.bounds;
+    [cellView addSubview:field];
+
+    self.inlineEditingActive = YES;
+    self.inlineEditingCancelled = NO;
+    [self.view.window makeFirstResponder:field];
+}
+
+- (void)discardInlineEditing
+{
+    if (!self.inlineEditingActive) {
+        return;
+    }
+    self.inlineEditingActive = NO;
+    [self removeInlineEditor];
+}
+
+- (void)removeInlineEditor
+{
+    if (_inlineEditorField.superview == nil) {
+        return;
+    }
+    if (_inlineEditorField.currentEditor != nil) {
+        // Ends the field-editor session; the resulting action is a no-op since
+        // inlineEditingActive has already been cleared by the caller.
+        [self.view.window makeFirstResponder:self.tableView];
+    }
+    [_inlineEditorField removeFromSuperview];
+}
+
+- (void)inlineEditorAction:(NSTextField *)sender
+{
+    if (!self.inlineEditingActive) {
+        return;
+    }
+    self.inlineEditingActive = NO;
+
+    BOOL cancelled = self.inlineEditingCancelled;
     NSInteger row = [self.tableView rowForView:sender];
     NSInteger column = [self.tableView columnForView:sender];
-    if (row == NOT_A_ROW || column == NOT_A_COLUMN) {
+    id enteredNumber = sender.objectValue;
+    NSString *enteredString = sender.stringValue;
+
+    [self removeInlineEditor];
+
+    if (cancelled || row == NOT_A_ROW || column == NOT_A_COLUMN) {
         return;
     }
 
@@ -1105,24 +1232,22 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     id newValue;
     switch (classProperty.type) {
         case RLMPropertyTypeInt:
-            // The field's formatter parses freely; clamp to an integral value.
-            newValue = sender.objectValue ? @([sender.objectValue longLongValue]) : nil;
+            // The formatter parses freely; clamp to an integral value.
+            newValue = [enteredNumber isKindOfClass:[NSNumber class]] ? @([enteredNumber longLongValue]) : nil;
             break;
         case RLMPropertyTypeFloat:
         case RLMPropertyTypeDouble:
-            newValue = sender.objectValue;
+            newValue = [enteredNumber isKindOfClass:[NSNumber class]] ? enteredNumber : nil;
             break;
         case RLMPropertyTypeString:
-            newValue = sender.stringValue;
+            newValue = enteredString;
             break;
         default:
             return;
     }
 
     if (newValue == nil && !classProperty.property.optional) {
-        // Unparseable input on a required property: restore the display.
-        [self.tableView reloadDataForRowIndexes:[NSIndexSet indexSetWithIndex:row]
-                                  columnIndexes:[NSIndexSet indexSetWithIndex:column]];
+        NSBeep();
         return;
     }
 
@@ -1144,9 +1269,17 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     @catch (NSException *exception) {
         [realm cancelWriteTransaction];
         NSBeep();
-        [self.tableView reloadDataForRowIndexes:[NSIndexSet indexSetWithIndex:row]
-                                  columnIndexes:[NSIndexSet indexSetWithIndex:column]];
     }
+}
+
+- (BOOL)control:(NSControl *)control textView:(NSTextView *)textView doCommandBySelector:(SEL)commandSelector
+{
+    if (control == _inlineEditorField && commandSelector == @selector(cancelOperation:)) {
+        self.inlineEditingCancelled = YES;
+        [self.view.window makeFirstResponder:self.tableView];
+        return YES;
+    }
+    return NO;
 }
 
 #pragma mark - Public Methods - Table View Construction

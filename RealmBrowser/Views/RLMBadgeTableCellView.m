@@ -28,8 +28,6 @@
         return nil;
     }
 
-    // Manual frame layout: see RLMBasicTableCellView. This cell manages the
-    // inherited text field's frame itself in its own -layout.
     NSButton *button = [[NSButton alloc] initWithFrame:NSZeroRect];
     button.translatesAutoresizingMaskIntoConstraints = NO;
     button.buttonType = NSButtonTypeMomentaryPushIn;
@@ -50,8 +48,7 @@
     [super layout];
 
     // The badge hugs the trailing edge at its natural size (which tracks its
-    // title, so the controller marks the cell needsLayout after changing it);
-    // the text field fills the rest.
+    // title, so the controller marks the cell needsLayout after changing it).
     [self.badge sizeToFit];
 
     NSRect bounds = self.bounds;
@@ -59,9 +56,15 @@
     self.badge.frame = NSMakeRect(NSMaxX(bounds) - badgeSize.width,
                                   round(NSMidY(bounds) - (badgeSize.height / 2.0)),
                                   badgeSize.width, badgeSize.height);
-    self.textField.frame = NSMakeRect(0.0, 0.0,
-                                      MAX(0.0, bounds.size.width - badgeSize.width - 4.0),
-                                      bounds.size.height);
+    [self setNeedsDisplay:YES];
+}
+
+// The drawn text stops short of the badge.
+- (NSRect)textDrawingRect
+{
+    NSRect bounds = self.bounds;
+    CGFloat badgeInset = self.badge.hidden ? 0.0 : NSWidth(self.badge.frame) + 4.0;
+    return NSMakeRect(0.0, 0.0, MAX(0.0, NSWidth(bounds) - badgeInset), NSHeight(bounds));
 }
 
 @end

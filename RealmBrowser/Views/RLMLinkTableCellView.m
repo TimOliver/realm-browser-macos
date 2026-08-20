@@ -21,9 +21,14 @@
 
 @implementation RLMLinkTableCellView
 
-- (void)setBackgroundStyle:(NSBackgroundStyle)backgroundStyle {
-    [super setBackgroundStyle:backgroundStyle];
-    self.textField.textColor = (backgroundStyle == NSBackgroundStyleEmphasized ? [NSColor alternateSelectedControlTextColor] : [NSColor linkColor]);
+- (NSDictionary *)textAttributes
+{
+    NSMutableDictionary *attributes = [[super textAttributes] mutableCopy];
+    if (self.backgroundStyle != NSBackgroundStyleEmphasized) {
+        attributes[NSForegroundColorAttributeName] = [NSColor linkColor];
+    }
+    attributes[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
+    return attributes;
 }
 
 @end

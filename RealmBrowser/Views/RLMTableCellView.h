@@ -22,6 +22,15 @@
 
 @property (nonatomic, assign) BOOL optional;
 
+// Drawn directly in drawRect — text cells host no NSTextField, which is what
+// keeps scrolling cheap. nil means the cell doesn't use drawn text (bool/popup
+// cells); an empty string draws the "nil" placeholder when `optional` is set.
+@property (nonatomic, copy) NSString *text;
+
 + (instancetype)viewWithIdentifier:(NSString *)identifier;
+
+// Override points for subclasses (link styling, badge inset).
+- (NSDictionary *)textAttributes;
+- (NSRect)textDrawingRect;
 
 @end
