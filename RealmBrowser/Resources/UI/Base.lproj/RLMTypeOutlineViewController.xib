@@ -72,7 +72,7 @@
                                                         <rect key="frame" x="4" y="3" width="16" height="16"/>
                                                         <imageCell key="cell" refusesFirstResponder="YES" alignment="left" imageScaling="proportionallyDown" id="sym-ic-cls"/>
                                                     </imageView>
-                                                    <textField focusRingType="none" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="EaJ-q6-IlG">
+                                                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" translatesAutoresizingMaskIntoConstraints="NO" id="EaJ-q6-IlG">
                                                         <rect key="frame" x="24" y="3" width="165" height="16"/>
                                                         <textFieldCell key="cell" lineBreakMode="truncatingTail" sendsActionOnEndEditing="YES" alignment="left" title="Row label" id="A0k-QZ-8eL">
                                                             <font key="font" metaFont="system"/>
@@ -80,7 +80,7 @@
                                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                         </textFieldCell>
                                                     </textField>
-                                                    <button hidden="YES" horizontalHuggingPriority="751" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="I1l-Wv-wMz">
+                                                    <button hidden="YES" horizontalHuggingPriority="751" verticalHuggingPriority="750" horizontalCompressionResistancePriority="760" translatesAutoresizingMaskIntoConstraints="NO" id="I1l-Wv-wMz">
                                                         <rect key="frame" x="195" y="2" width="38" height="18"/>
                                                         <buttonCell key="cell" type="inline" title="0123" bezelStyle="inline" alignment="center" state="on" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="Lw1-PH-p6Q">
                                                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
