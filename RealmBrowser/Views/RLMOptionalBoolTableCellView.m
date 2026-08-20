@@ -36,8 +36,9 @@
         return nil;
     }
     
-    // Frame-based layout: see RLMBasicTableCellView.
+    // Manual frame layout: see RLMBasicTableCellView.
     NSPopUpButton *popupButton = [[NSPopUpButton alloc] initWithFrame:self.bounds pullsDown:NO];
+    popupButton.translatesAutoresizingMaskIntoConstraints = NO;
     [popupButton addItemsWithTitles:@[@"nil", @"false", @"true"]];
     popupButton.bordered = NO;
     [popupButton sizeToFit];

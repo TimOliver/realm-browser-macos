@@ -55,12 +55,12 @@ const NSInteger NOT_A_COLUMN = -1;
 - (void)awakeFromNib
 {
     [super awakeFromNib];
-    
+
     int options = NSTrackingActiveInKeyWindow | NSTrackingInVisibleRect | NSTrackingMouseEnteredAndExited
     | NSTrackingMouseMoved | NSTrackingCursorUpdate;
     trackingArea = [[NSTrackingArea alloc] initWithRect:[self bounds] options:options owner:self userInfo:nil];
     [self addTrackingArea:trackingArea];
-    
+
     currentMouseLocation = RLMTableLocationUndefined;
     previousMouseLocation = RLMTableLocationUndefined;
 
@@ -499,34 +499,44 @@ enum MenuTags {
     self.autosaveTableColumns = NO;
     self.autosaveName = nil;
 
+    // Columns are pooled: the pool grows to the widest schema seen and columns
+    // are reconfigured in place — never removed — with the surplus hidden. This
+    // keeps the table's cell reuse queues alive across class switches, so most
+    // of row population becomes re-binding existing views instead of creating
+    // them.
+    NSUInteger neededColumns = newPropertyColumns.count + (isArray ? 1 : 0);
+
     [self beginUpdates];
-    while (self.numberOfColumns > 0) {
-        [self removeTableColumn:[self.tableColumns lastObject]];
+    while ((NSUInteger)self.numberOfColumns < neededColumns) {
+        RLMTableColumn *column = [[RLMTableColumn alloc] initWithIdentifier:[NSString stringWithFormat:@"pool.%ld", (long)self.numberOfColumns]];
+        column.minWidth = 26.0;
+        [self addTableColumn:column];
     }
-    [self endUpdates];
 
-    [self reloadData];
+    NSUInteger columnIndex = 0;
 
-    [self beginUpdates];
-    // If array, add extra first column with numbers
-    if ([typeNode isMemberOfClass:[RLMArrayNode class]]) {
-        RLMTableColumn *tableColumn = [[RLMTableColumn alloc] initWithIdentifier:@"#"];
+    // If array, the first column shows the element index
+    if (isArray) {
+        RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex++];
+        tableColumn.hidden = NO;
+        tableColumn.identifier = @"#";
         tableColumn.propertyType = RLMPropertyTypeInt;
+        tableColumn.classProperty = nil;
         tableColumn.title = @"#";
         tableColumn.headerToolTip = @"Order of object within array";
-
-        [self addTableColumn:tableColumn];
+        tableColumn.width = 64.0;
     }
 
-    // ... and add new columns matching the structure of the new realm table.
-    NSArray *propertyColumns = typeNode.propertyColumns;
-
-    for (NSUInteger index = 0; index < propertyColumns.count; index++) {
-        RLMClassProperty *propertyColumn = propertyColumns[index];
-        RLMTableColumn *tableColumn = [[RLMTableColumn alloc] initWithIdentifier:propertyColumn.name];
-
+    for (RLMClassProperty *propertyColumn in newPropertyColumns) {
+        RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex++];
+        tableColumn.hidden = NO;
+        tableColumn.identifier = propertyColumn.name;
         tableColumn.propertyType = propertyColumn.type;
+        // The statistics tooltip requires full-table aggregate queries, so it is
+        // computed lazily on first hover (see stringForToolTip:) rather than here.
+        tableColumn.classProperty = propertyColumn;
         tableColumn.title = propertyColumn.name;
+        tableColumn.headerToolTip = nil;
 
         CGFloat initialWidth = 100.0;
         switch (propertyColumn.type) {
@@ -541,16 +551,21 @@ enum MenuTags {
             default:
                 break;
         }
-        tableColumn.minWidth = 26.0;
         tableColumn.width = initialWidth;
+    }
 
-        // The statistics tooltip requires full-table aggregate queries, so it is
-        // computed lazily on first hover (see stringForToolTip:) rather than here.
-        tableColumn.classProperty = propertyColumn;
-        [self addTableColumn:tableColumn];
+    // Park the rest of the pool out of sight, under identifiers that cannot
+    // collide with a property name in the column-state autosave archive.
+    for (; columnIndex < (NSUInteger)self.numberOfColumns; columnIndex++) {
+        RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex];
+        tableColumn.hidden = YES;
+        tableColumn.identifier = [NSString stringWithFormat:@"pool.unused.%lu", (unsigned long)columnIndex];
+        tableColumn.classProperty = nil;
     }
 
     [self endUpdates];
+
+    [self reloadData];
 
     [self updateHeaderToolTipRects];
 
@@ -598,6 +613,9 @@ enum MenuTags {
 -(void)makeColumnsFitContents
 {
     for (RLMTableColumn *column in self.tableColumns) {
+        if (column.hidden) {
+            continue;
+        }
         column.width = [column sizeThatFitsWithLimit:YES];
     }
 }

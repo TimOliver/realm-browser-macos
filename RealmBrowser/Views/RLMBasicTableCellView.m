@@ -28,11 +28,14 @@
         return nil;
     }
     
-    // Cells are created by the hundreds while scrolling/navigating, so they use
-    // frame-based layout — Auto Layout constraint setup and solving dominated the
-    // profile when populating rows.
+    // Cells are created by the hundreds while scrolling/navigating, so they are
+    // laid out manually in -layout — constraint setup and solving dominated the
+    // profile when populating rows. translatesAutoresizingMaskIntoConstraints is
+    // disabled WITHOUT adding constraints so that no constraints exist for these
+    // views at all; NSTableCellView's automatic textField placement otherwise
+    // fights the autoresizing-mask constraints and floods the console.
     NSTextField *textField = [[NSTextField alloc] initWithFrame:self.bounds];
-    textField.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    textField.translatesAutoresizingMaskIntoConstraints = NO;
     textField.bordered = NO;
     textField.drawsBackground = NO;
     textField.cell.sendsActionOnEndEditing = YES;
@@ -49,6 +52,12 @@
     [self addSubview:textField];
 
     return self;
+}
+
+- (void)layout
+{
+    [super layout];
+    self.textField.frame = self.bounds;
 }
 
 @end

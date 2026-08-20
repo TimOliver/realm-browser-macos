@@ -28,9 +28,10 @@
         return nil;
     }
 
-    // Frame-based layout: see RLMBasicTableCellView. This cell manages the
-    // inherited text field's frame itself, so it must not autoresize to fill.
+    // Manual frame layout: see RLMBasicTableCellView. This cell manages the
+    // inherited text field's frame itself in its own -layout.
     NSButton *button = [[NSButton alloc] initWithFrame:NSZeroRect];
+    button.translatesAutoresizingMaskIntoConstraints = NO;
     button.buttonType = NSButtonTypeMomentaryPushIn;
     button.bezelStyle = NSBezelStyleInline;
 
@@ -40,8 +41,6 @@
 
     self.badge = button;
     [self addSubview:button];
-
-    self.textField.autoresizingMask = NSViewNotSizable;
 
     return self;
 }

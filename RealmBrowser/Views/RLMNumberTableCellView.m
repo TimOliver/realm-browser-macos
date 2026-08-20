@@ -89,9 +89,9 @@
         return nil;
     }
     
-    // Frame-based layout: see RLMBasicTableCellView.
+    // Manual frame layout: see RLMBasicTableCellView.
     RLMNumberTextField *textField = [[RLMNumberTextField alloc] initWithFrame:self.bounds];
-    textField.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    textField.translatesAutoresizingMaskIntoConstraints = NO;
     textField.bordered = NO;
     textField.drawsBackground = NO;
     textField.alignment = NSTextAlignmentLeft;
@@ -113,6 +113,12 @@
     [self addSubview:textField];
 
     return self;
+}
+
+- (void)layout
+{
+    [super layout];
+    self.textField.frame = self.bounds;
 }
 
 @end

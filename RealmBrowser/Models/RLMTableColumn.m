@@ -29,6 +29,15 @@
 const NSUInteger kMaxNumberOfRowsToConsider = 50;
 const CGFloat kMaxColumnWidth = 200.0;
 
+// Columns are pooled and repurposed when the displayed class changes, so the
+// values derived from the property must reset alongside it.
+- (void)setClassProperty:(RLMClassProperty *)classProperty
+{
+    _classProperty = classProperty;
+    _cellReuseIdentifier = nil;
+    self.cachedHeaderToolTip = nil;
+}
+
 - (NSString *)cellReuseIdentifier
 {
     if (_cellReuseIdentifier == nil && self.classProperty != nil) {

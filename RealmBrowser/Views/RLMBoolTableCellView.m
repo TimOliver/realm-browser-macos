@@ -28,8 +28,9 @@
         return nil;
     }
     
-    // Frame-based layout: see RLMBasicTableCellView.
+    // Manual frame layout: see RLMBasicTableCellView.
     NSButton *button = [[NSButton alloc] initWithFrame:self.bounds];
+    button.translatesAutoresizingMaskIntoConstraints = NO;
     button.title = @"";
     button.buttonType = NSButtonTypeSwitch;
     [button sizeToFit];
