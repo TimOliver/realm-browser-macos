@@ -435,7 +435,9 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             }
 
             numberCellView.textField.objectValue = propertyValue;
-            numberCellView.textField.editable = NO;
+            numberCellView.textField.editable = ![self isPrimaryKeyProperty:property ofInstance:selectedInstance];
+            numberCellView.textField.target = self;
+            numberCellView.textField.action = @selector(cellTextFieldEdited:);
 
             cellView = numberCellView;
 
@@ -473,7 +475,12 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             }
 
             basicCellView.textField.stringValue = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-            basicCellView.textField.editable = NO;
+            // Of the types sharing this cell, only strings round-trip losslessly
+            // through their displayed text, so only they edit inline.
+            basicCellView.textField.editable = (classProperty.type == RLMPropertyTypeString
+                                                && ![self isPrimaryKeyProperty:property ofInstance:selectedInstance]);
+            basicCellView.textField.target = self;
+            basicCellView.textField.action = @selector(cellTextFieldEdited:);
 
             cellView = basicCellView;
 
@@ -532,8 +539,9 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 // RLMObject operations (when showing class table)
 - (void)deleteObjects:(NSIndexSet *)rowIndexes
 {
+    // The realm change notification reloads all windows; an explicit reload here
+    // would do the full pass a second time.
     [self deleteObjectsInRealmAtIndexes:rowIndexes];
-    [self.parentWindowController reloadAllWindows];
 }
 
 - (void)copyValueFromRow:(NSInteger)row column:(NSInteger)column {
@@ -560,9 +568,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         newObject = [self.class createObjectInRealm:realm withSchema:self.displayedType.schema];
     }
     [realm commitWriteTransaction];
-    
-    [self.parentWindowController reloadAllWindows];
-    
+    // The change notification has reloaded all windows by this point.
+
     if (newObject && [self.displayedType isKindOfClass:RLMClassNode.class]) {
         RLMClassNode *classNode = (RLMClassNode *)self.displayedType;
         NSUInteger row = [classNode indexOfInstance:newObject];
@@ -823,8 +830,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         selectedInstance[classProperty.name] = newValue;
     }];
     [realm commitWriteTransaction];
-    
-    [self.parentWindowController reloadAllWindows];
+    // The change notification reloads all windows.
 }
 
 #pragma mark - Rearranging objects in arrays - Private methods
@@ -1051,8 +1057,96 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     }
 }
 
-- (void)userDoubleClicked:(NSTableView *)sender {
-    // Inline editing is retired; the inspector panel handles property edits.
+- (void)userDoubleClicked:(NSTableView *)sender
+{
+    NSInteger row = self.tableView.clickedRow;
+    NSInteger column = self.tableView.clickedColumn;
+    if (row == NOT_A_ROW || column == NOT_A_COLUMN) {
+        return;
+    }
+
+    NSTableCellView *cellView = (NSTableCellView *)[self.tableView viewAtColumn:column row:row makeIfNecessary:NO];
+    if ([cellView isKindOfClass:[NSTableCellView class]] && cellView.textField.editable) {
+        [self.view.window makeFirstResponder:cellView.textField];
+    }
+}
+
+#pragma mark - Inline editing
+
+// Primitive-array rows are represented by a proxy rather than a real object;
+// they have no primary key (and no objectSchema to ask).
+- (BOOL)isPrimaryKeyProperty:(RLMProperty *)property ofInstance:(RLMObject *)instance
+{
+    if (![instance isKindOfClass:[RLMObject class]]) {
+        return NO;
+    }
+    return [property.name isEqualToString:instance.objectSchema.primaryKeyProperty.name];
+}
+
+- (void)cellTextFieldEdited:(NSTextField *)sender
+{
+    NSInteger row = [self.tableView rowForView:sender];
+    NSInteger column = [self.tableView columnForView:sender];
+    if (row == NOT_A_ROW || column == NOT_A_COLUMN) {
+        return;
+    }
+
+    NSInteger propertyIndex = [self propertyIndexForColumn:column];
+    if (propertyIndex < 0 || propertyIndex >= (NSInteger)self.displayedType.propertyColumns.count) {
+        return;
+    }
+
+    RLMClassProperty *classProperty = self.displayedType.propertyColumns[propertyIndex];
+    RLMObject *instance = [self.displayedType instanceAtIndex:row];
+    if ([instance respondsToSelector:@selector(isInvalidated)] && instance.isInvalidated) {
+        return;
+    }
+
+    id newValue;
+    switch (classProperty.type) {
+        case RLMPropertyTypeInt:
+            // The field's formatter parses freely; clamp to an integral value.
+            newValue = sender.objectValue ? @([sender.objectValue longLongValue]) : nil;
+            break;
+        case RLMPropertyTypeFloat:
+        case RLMPropertyTypeDouble:
+            newValue = sender.objectValue;
+            break;
+        case RLMPropertyTypeString:
+            newValue = sender.stringValue;
+            break;
+        default:
+            return;
+    }
+
+    if (newValue == nil && !classProperty.property.optional) {
+        // Unparseable input on a required property: restore the display.
+        [self.tableView reloadDataForRowIndexes:[NSIndexSet indexSetWithIndex:row]
+                                  columnIndexes:[NSIndexSet indexSetWithIndex:column]];
+        return;
+    }
+
+    id currentValue = instance[classProperty.name];
+    if (currentValue == NSNull.null) {
+        currentValue = nil;
+    }
+    if (currentValue == newValue || [currentValue isEqual:newValue]) {
+        return;
+    }
+
+    RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
+    [realm beginWriteTransaction];
+    @try {
+        instance[classProperty.name] = newValue;
+        [realm commitWriteTransaction];
+        // The realm change notification triggers the table reload.
+    }
+    @catch (NSException *exception) {
+        [realm cancelWriteTransaction];
+        NSBeep();
+        [self.tableView reloadDataForRowIndexes:[NSIndexSet indexSetWithIndex:row]
+                                  columnIndexes:[NSIndexSet indexSetWithIndex:column]];
+    }
 }
 
 #pragma mark - Public Methods - Table View Construction

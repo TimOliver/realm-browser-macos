@@ -19,6 +19,7 @@
 #import "RLMArrayNode.h"
 
 #import "RLMSidebarTableCellView.h"
+#import "RLMDescriptions.h"
 
 @interface RLMProperty (Dynamic)
 - (instancetype)initWithName:(NSString *)name
@@ -211,7 +212,14 @@
 
 - (NSString *)toolTipString
 {
-    return _referringObject.description;
+    // -description serializes up to 100 elements of every list property on the
+    // referring object; the bounded per-property summary is enough for a tooltip.
+    static RLMDescriptions *descriptions;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        descriptions = [[RLMDescriptions alloc] init];
+    });
+    return [descriptions descriptionOfObject:_referringObject];
 }
 
 @end

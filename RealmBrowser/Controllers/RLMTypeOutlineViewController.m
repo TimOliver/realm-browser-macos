@@ -241,9 +241,14 @@
 
 - (void)removeAllChildArrays
 {
+    // This runs on every sidebar selection; reloadItem: is expensive enough that
+    // it's only worth issuing for nodes that actually displayed children.
     for (RLMClassNode *node in self.parentWindowController.document.presentedRealm.topLevelClasses) {
+        BOOL hadVisibleChildren = (node.numberOfChildNodes > 0);
         [node removeAllChildNodes];
-        [self.classesOutlineView reloadItem:node];
+        if (hadVisibleChildren) {
+            [self.classesOutlineView reloadItem:node];
+        }
     }
 }
 
