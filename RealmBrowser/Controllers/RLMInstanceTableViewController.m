@@ -65,6 +65,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     RLMDescriptions *realmDescriptions;
     RLMNotificationToken *displayedCollectionToken;
     NSInteger pendingScrollRow;
+    NSInteger inlineEditingRow;
+    NSInteger inlineEditingColumn;
 }
 
 - (void)dealloc
@@ -100,6 +102,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     
     linkCursorDisplaying = NO;
     pendingScrollRow = NOT_A_ROW;
+    inlineEditingRow = NOT_A_ROW;
+    inlineEditingColumn = NOT_A_COLUMN;
 
     realmDescriptions = [[RLMDescriptions alloc] init];
     
@@ -965,10 +969,10 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     // Tooltips are built here, for just the hovered cell, rather than for every
     // cell in viewForTableColumn: — describing links/arrays walks the linked
     // objects' properties and is far too expensive to run per cell on scroll.
-    NSView *hoveredCellView = [self.tableView viewAtColumn:location.column row:location.row makeIfNecessary:NO];
-    if (hoveredCellView) {
-        hoveredCellView.toolTip = [realmDescriptions tooltipForPropertyValue:propertyValue ofType:propertyNode.property];
-    }
+    // There are no cell views; the tooltip is set on the hovered row view and
+    // replaced as the mouse moves between that row's cells.
+    NSTableRowView *hoveredRowView = [self.tableView rowViewAtRow:location.row makeIfNecessary:NO];
+    hoveredRowView.toolTip = [realmDescriptions tooltipForPropertyValue:propertyValue ofType:propertyNode.property];
 
     if (!propertyValue) {
         [self disableLinkCursor];
@@ -982,6 +986,9 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
 - (void)mouseDidExitCellAtLocation:(RLMTableLocation)location
 {
+    if (location.row >= 0) {
+        [self.tableView rowViewAtRow:location.row makeIfNecessary:NO].toolTip = nil;
+    }
     [self disableLinkCursor];
 }
 
@@ -1143,8 +1150,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         return;
     }
 
-    NSView *cellView = [self.tableView viewAtColumn:column row:row makeIfNecessary:NO];
-    if (cellView == nil) {
+    NSTableRowView *rowView = [self.tableView rowViewAtRow:row makeIfNecessary:NO];
+    if (rowView == nil) {
         return;
     }
 
@@ -1165,8 +1172,10 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         field.objectValue = value;
     }
 
-    field.frame = cellView.bounds;
-    [cellView addSubview:field];
+    field.frame = [rowView convertRect:[self.tableView frameOfCellAtColumn:column row:row] fromView:self.tableView];
+    [rowView addSubview:field];
+    inlineEditingRow = row;
+    inlineEditingColumn = column;
 
     self.inlineEditingActive = YES;
     self.inlineEditingCancelled = NO;
@@ -1179,6 +1188,8 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         return;
     }
     self.inlineEditingActive = NO;
+    inlineEditingRow = NOT_A_ROW;
+    inlineEditingColumn = NOT_A_COLUMN;
     [self removeInlineEditor];
 }
 
@@ -1203,8 +1214,12 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     self.inlineEditingActive = NO;
 
     BOOL cancelled = self.inlineEditingCancelled;
-    NSInteger row = [self.tableView rowForView:sender];
-    NSInteger column = [self.tableView columnForView:sender];
+    // The editor is a direct subview of the row view, so columnForView: cannot
+    // recover the column; both were recorded when editing began.
+    NSInteger row = inlineEditingRow;
+    NSInteger column = inlineEditingColumn;
+    inlineEditingRow = NOT_A_ROW;
+    inlineEditingColumn = NOT_A_COLUMN;
     id enteredNumber = sender.objectValue;
     NSString *enteredString = sender.stringValue;
 

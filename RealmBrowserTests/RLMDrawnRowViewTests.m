@@ -31,6 +31,15 @@
 #import "RLMTestDataGenerator.h"
 #import "TestClasses.h"
 
+// beginInlineEditingAtRow:column: and the editor field are private to the controller;
+// the test drives them directly to check the editor's geometry and bookkeeping.
+@interface RLMInstanceTableViewController (RLMDrawnRowViewTests)
+@property (nonatomic, strong) NSTextField *inlineEditorField;
+@property (nonatomic) BOOL inlineEditingActive;
+- (void)beginInlineEditingAtRow:(NSInteger)row column:(NSInteger)column;
+- (void)discardInlineEditing;
+@end
+
 // A data source/delegate that serves the same RLMCellContent per column to every row.
 @interface RLMDrawnRowViewTestHost : NSObject <NSTableViewDataSource, NSTableViewDelegate, RLMDrawnRowViewDataSource>
 @property (nonatomic, copy) NSArray<RLMCellContent *> *contentsByColumn;
@@ -302,6 +311,64 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
 
     // Out-of-range indexes are ignored.
     [tableView redrawRowsAtIndexes:[NSIndexSet indexSetWithIndex:99]];
+}
+
+#pragma mark - Inline editing
+
+// Builds a controller showing `classNode` inside an offscreen window, with row views made.
+- (RLMInstanceTableViewController *)hostedControllerForClassNode:(RLMClassNode *)classNode
+{
+    RLMInstanceTableViewController *controller = [[RLMInstanceTableViewController alloc] init];
+    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 900, 400)
+                                              styleMask:NSWindowStyleMaskBorderless
+                                                backing:NSBackingStoreBuffered
+                                                  defer:NO];
+    controller.view.frame = [self.window.contentView bounds];
+    [self.window.contentView addSubview:controller.view];
+    controller.displayedType = classNode;
+    [controller.realmTableView setupColumnsWithType:classNode];
+    [controller.realmTableView reloadData];
+    [controller.view layoutSubtreeIfNeeded];
+    [controller.realmTableView tile];
+    return controller;
+}
+
+- (void)testInlineEditorCoversOnlyTheEditedCellOfTheRowView
+{
+    NSString *fileName = [NSString stringWithFormat:@"%@.realm", [[NSUUID UUID] UUIDString]];
+    NSURL *fileURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+    @autoreleasepool {
+        XCTAssertTrue([RLMTestDataGenerator createRealmAtUrl:fileURL withClassesNamed:@[[RealmTestClass1 className]] objectCount:5 encryptionKey:nil]);
+    }
+    RLMRealmNode *realmNode = [[RLMRealmNode alloc] initWithFileURL:fileURL];
+    XCTAssertTrue([realmNode connect:nil]);
+    RLMClassNode *classNode = nil;
+    for (RLMClassNode *node in realmNode.topLevelClasses) {
+        if ([node.name isEqualToString:[RealmTestClass1 className]]) { classNode = node; }
+    }
+    XCTAssertNotNil(classNode);
+
+    RLMInstanceTableViewController *controller = [self hostedControllerForClassNode:classNode];
+    NSTableView *tableView = controller.tableView;
+
+    // stringValue is editable; find its column.
+    NSInteger column = [tableView columnWithIdentifier:@"stringValue"];
+    XCTAssertGreaterThanOrEqual(column, 0);
+    NSTableRowView *rowView = [tableView rowViewAtRow:2 makeIfNecessary:YES];
+    XCTAssertTrue([rowView isKindOfClass:[RLMDrawnRowView class]]);
+
+    [controller beginInlineEditingAtRow:2 column:column];
+    XCTAssertTrue(controller.inlineEditingActive);
+
+    NSTextField *field = controller.inlineEditorField;
+    XCTAssertEqualObjects(field.superview, rowView, @"the editor is hosted by the row view");
+    NSRect expected = [rowView convertRect:[tableView frameOfCellAtColumn:column row:2] fromView:tableView];
+    XCTAssertTrue(NSEqualRects(field.frame, expected), @"editor covers just the edited cell, not the whole row");
+    XCTAssertLessThan(NSWidth(field.frame), NSWidth(rowView.bounds));
+
+    [controller discardInlineEditing];
+    XCTAssertFalse(controller.inlineEditingActive);
+    XCTAssertNil(field.superview);
 }
 
 @end
