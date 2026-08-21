@@ -43,7 +43,7 @@
                     <scroller key="verticalScroller" hidden="YES" wantsLayer="YES" verticalHuggingPriority="750" horizontal="NO" id="PKq-wN-eoD">
                         <autoresizingMask key="autoresizingMask"/>
                     </scroller>
-                    <tableHeaderView key="headerView" wantsLayer="YES" id="cDp-e2-1cA">
+                    <tableHeaderView key="headerView" wantsLayer="YES" id="cDp-e2-1cA" customClass="RLMTableHeaderView">
                         <rect key="frame" x="0.0" y="0.0" width="700" height="23"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </tableHeaderView>

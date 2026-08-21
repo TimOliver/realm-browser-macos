@@ -49,7 +49,7 @@
                     <scroller key="verticalScroller" hidden="YES" verticalHuggingPriority="750" horizontal="NO" id="QdJ-3D-J7b">
                         <autoresizingMask key="autoresizingMask"/>
                     </scroller>
-                    <tableHeaderView key="headerView" id="AgY-7N-8os">
+                    <tableHeaderView key="headerView" id="AgY-7N-8os" customClass="RLMTableHeaderView">
                         <rect key="frame" x="0.0" y="0.0" width="475" height="23"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </tableHeaderView>

@@ -25,7 +25,80 @@
 
 const NSInteger NOT_A_COLUMN = -1;
 
+static void RLMPerformWithoutAnimations(void (^changes)(void))
+{
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        context.duration = 0.0;
+        context.allowsImplicitAnimation = NO;
+        changes();
+    } completionHandler:nil];
+    [CATransaction commit];
+}
+
+static NSDictionary<NSAnimatablePropertyKey, id> *RLMDisabledViewAnimations(void)
+{
+    static NSDictionary<NSAnimatablePropertyKey, id> *animations = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        animations = @{
+            @"bounds": [NSNull null],
+            @"boundsOrigin": [NSNull null],
+            @"boundsSize": [NSNull null],
+            @"contents": [NSNull null],
+            @"frame": [NSNull null],
+            @"frameOrigin": [NSNull null],
+            @"frameSize": [NSNull null],
+            @"hidden": [NSNull null],
+            @"position": [NSNull null],
+        };
+    });
+    return animations;
+}
+
+@interface RLMTableHeaderView : NSTableHeaderView
+@end
+
+@implementation RLMTableHeaderView
+
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    self = [super initWithCoder:coder];
+    if (self) {
+        self.animations = RLMDisabledViewAnimations();
+    }
+    return self;
+}
+
+- (void)setFrame:(NSRect)frameRect
+{
+    RLMPerformWithoutAnimations(^{
+        [super setFrame:frameRect];
+    });
+}
+
+- (void)setBounds:(NSRect)boundsRect
+{
+    RLMPerformWithoutAnimations(^{
+        [super setBounds:boundsRect];
+    });
+}
+
+// The instance table is layer-backed for scrolling performance. When columns are
+// re-used for a different class, the header's layer otherwise animates the
+// redrawn title positions/contents, which reads as the titles sliding into place.
+- (id<CAAction>)actionForLayer:(CALayer *)layer forKey:(NSString *)event
+{
+    return (id<CAAction>)[NSNull null];
+}
+
+@end
+
 @interface RLMTableView()<NSMenuDelegate>
+
+- (void)disableColumnAnimationOnScrollView;
+- (void)settleColumnGeometry;
 
 @end
 
@@ -72,6 +145,7 @@ const NSInteger NOT_A_COLUMN = -1;
 
     [self createContextMenuItems];
     self.allowsColumnReordering = NO;
+    [self disableColumnAnimationOnScrollView];
 
 
 
@@ -512,89 +586,90 @@ enum MenuTags {
 
     if ([signature isEqualToString:currentColumnSignature]) {
         NSUInteger firstPropertyColumn = isArray ? 1 : 0;
-        for (NSUInteger index = 0; index < newPropertyColumns.count; index++) {
-            RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[firstPropertyColumn + index];
-            tableColumn.classProperty = newPropertyColumns[index];
-            tableColumn.cachedHeaderToolTip = nil; // The statistics reflect the new node's data
-        }
-        // Not reloadData: that purges the row reuse pool, and the rows would all be
-        // rebuilt. The row count is updated and every visible row redraws its content.
-        [self noteNumberOfRowsChanged];
-        [self redrawAllRows];
+        RLMPerformWithoutAnimations(^{
+            for (NSUInteger index = 0; index < newPropertyColumns.count; index++) {
+                RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[firstPropertyColumn + index];
+                tableColumn.classProperty = newPropertyColumns[index];
+                tableColumn.cachedHeaderToolTip = nil; // The statistics reflect the new node's data
+            }
+            // Not reloadData: that purges the row reuse pool, and the rows would all be
+            // rebuilt. The row count is updated and every visible row redraws its content.
+            [self noteNumberOfRowsChanged];
+            [self redrawAllRows];
+        });
         return;
     }
     currentColumnSignature = signature;
 
-    // Column mutations synchronously write table-state autosave entries — still
-    // keyed to the *outgoing* class's autosave name at this point — so suspend
-    // autosaving while rebuilding. The window controller re-enables it with the
-    // new class's name once the columns are in place.
-    self.autosaveTableColumns = NO;
-    self.autosaveName = nil;
+    RLMPerformWithoutAnimations(^{
+        // Column mutations synchronously write table-state autosave entries — still
+        // keyed to the *outgoing* class's autosave name at this point — so suspend
+        // autosaving while rebuilding. The window controller re-enables it with the
+        // new class's name once the columns are in place.
+        self.autosaveTableColumns = NO;
+        self.autosaveName = nil;
 
-    // Columns are pooled: the pool grows to the widest schema seen and columns
-    // are reconfigured in place — never removed — with the surplus hidden. This
-    // keeps the table's cell reuse queues alive across class switches, so most
-    // of row population becomes re-binding existing views instead of creating
-    // them.
-    NSUInteger neededColumns = newPropertyColumns.count + (isArray ? 1 : 0);
+        // Columns are pooled: the pool grows to the widest schema seen and columns
+        // are reconfigured in place — never removed — with the surplus hidden. This
+        // keeps the table's cell reuse queues alive across class switches, so most
+        // of row population becomes re-binding existing views instead of creating
+        // them.
+        NSUInteger neededColumns = newPropertyColumns.count + (isArray ? 1 : 0);
 
-    // Deliberately not inside beginUpdates/endUpdates: that is NSTableView's animated
-    // batch-update API, so the pooled columns animate to the positions the new class
-    // gives them instead of simply being there when the table redraws.
-    while ((NSUInteger)self.numberOfColumns < neededColumns) {
-        RLMTableColumn *column = [[RLMTableColumn alloc] initWithIdentifier:[NSString stringWithFormat:@"pool.%ld", (long)self.numberOfColumns]];
-        column.minWidth = 26.0;
-        [self addTableColumn:column];
-    }
+        // Deliberately not inside beginUpdates/endUpdates: that is NSTableView's animated
+        // batch-update API, so the pooled columns animate to the positions the new class
+        // gives them instead of simply being there when the table redraws.
+        while ((NSUInteger)self.numberOfColumns < neededColumns) {
+            RLMTableColumn *column = [[RLMTableColumn alloc] initWithIdentifier:[NSString stringWithFormat:@"pool.%ld", (long)self.numberOfColumns]];
+            column.minWidth = 26.0;
+            [self addTableColumn:column];
+        }
 
-    NSUInteger columnIndex = 0;
+        NSUInteger columnIndex = 0;
 
-    // If array, the first column shows the element index
-    if (isArray) {
-        RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex++];
-        tableColumn.hidden = NO;
-        tableColumn.identifier = @"#";
-        tableColumn.propertyType = RLMPropertyTypeInt;
-        tableColumn.classProperty = nil;
-        tableColumn.title = @"#";
-        tableColumn.headerToolTip = @"Order of object within array";
-        [self restoreFittedWidthForColumn:tableColumn];
-    }
+        // If array, the first column shows the element index
+        if (isArray) {
+            RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex++];
+            tableColumn.hidden = NO;
+            tableColumn.identifier = @"#";
+            tableColumn.propertyType = RLMPropertyTypeInt;
+            tableColumn.classProperty = nil;
+            tableColumn.title = @"#";
+            tableColumn.headerToolTip = @"Order of object within array";
+            [self restoreFittedWidthForColumn:tableColumn];
+        }
 
-    for (RLMClassProperty *propertyColumn in newPropertyColumns) {
-        RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex++];
-        tableColumn.hidden = NO;
-        tableColumn.identifier = propertyColumn.name;
-        tableColumn.propertyType = propertyColumn.type;
-        // The statistics tooltip requires full-table aggregate queries, so it is
-        // computed lazily on first hover (see stringForToolTip:) rather than here.
-        tableColumn.classProperty = propertyColumn;
-        tableColumn.title = propertyColumn.name;
-        tableColumn.headerToolTip = nil;
+        for (RLMClassProperty *propertyColumn in newPropertyColumns) {
+            RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex++];
+            tableColumn.hidden = NO;
+            tableColumn.identifier = propertyColumn.name;
+            tableColumn.propertyType = propertyColumn.type;
+            // The statistics tooltip requires full-table aggregate queries, so it is
+            // computed lazily on first hover (see stringForToolTip:) rather than here.
+            tableColumn.classProperty = propertyColumn;
+            tableColumn.title = propertyColumn.name;
+            tableColumn.headerToolTip = nil;
 
-        [self restoreFittedWidthForColumn:tableColumn];
-    }
+            [self restoreFittedWidthForColumn:tableColumn];
+        }
 
-    // Park the rest of the pool out of sight, under identifiers that cannot
-    // collide with a property name in the column-state autosave archive.
-    for (; columnIndex < (NSUInteger)self.numberOfColumns; columnIndex++) {
-        RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex];
-        tableColumn.hidden = YES;
-        tableColumn.identifier = [NSString stringWithFormat:@"pool.unused.%lu", (unsigned long)columnIndex];
-        tableColumn.classProperty = nil;
-    }
+        // Park the rest of the pool out of sight, under identifiers that cannot
+        // collide with a property name in the column-state autosave archive.
+        for (; columnIndex < (NSUInteger)self.numberOfColumns; columnIndex++) {
+            RLMTableColumn *tableColumn = (RLMTableColumn *)self.tableColumns[columnIndex];
+            tableColumn.hidden = YES;
+            tableColumn.identifier = [NSString stringWithFormat:@"pool.unused.%lu", (unsigned long)columnIndex];
+            tableColumn.classProperty = nil;
+        }
 
-    // Not reloadData: that purges the row reuse pool, and the rows would all be
-    // rebuilt. The row count is updated and every visible row redraws its content.
-    [self noteNumberOfRowsChanged];
-    [self tile];
-    [self redrawAllRows];
+        // Not reloadData: that purges the row reuse pool, and the rows would all be
+        // rebuilt. The row count is updated and every visible row redraws its content.
+        [self noteNumberOfRowsChanged];
+        [self settleColumnGeometry];
+        [self redrawAllRows];
 
-    [self updateHeaderToolTipRects];
-
-    // FIXME: force layout subview to change header view height
-    [self.enclosingScrollView tile];
+        [self updateHeaderToolTipRects];
+    });
 }
 
 #pragma mark - Private Methods - Header tooltips
@@ -660,51 +735,49 @@ static const NSInteger kMaxRowsToMeasureForFit = 20;
     // Column width changes synchronously write the table's autosave state; the fit
     // would otherwise pay for that once per column.
     BOOL wasAutosavingColumns = self.autosaveTableColumns;
-    self.autosaveTableColumns = NO;
-    applyingFittedWidths = YES;
-    widthsChanged = NO;
-    // Deliberately not inside beginUpdates/endUpdates: that is NSTableView's animated
-    // batch-update API, and it animates the column geometry -- the header titles slide
-    // into their new positions. Assigning the widths plainly costs a little more, and
-    // is the reason the widths are cached per class so most navigations assign nothing.
+    RLMPerformWithoutAnimations(^{
+        self.autosaveTableColumns = NO;
+        applyingFittedWidths = YES;
+        widthsChanged = NO;
+        // Deliberately not inside beginUpdates/endUpdates: that is NSTableView's animated
+        // batch-update API, and it animates the column geometry -- the header titles slide
+        // into their new positions. Assigning the widths plainly costs a little more, and
+        // is the reason the widths are cached per class so most navigations assign nothing.
 
-    // Each column gets exactly its natural width — the header title plus the
-    // widest cell among the measured rows. No fill-out: a column of nils stays
-    // as narrow as its title, regardless of the window size.
-    for (RLMTableColumn *column in self.tableColumns) {
-        if (column.hidden) {
-            continue;
+        // Each column gets exactly its natural width — the header title plus the
+        // widest cell among the measured rows. No fill-out: a column of nils stays
+        // as narrow as its title, regardless of the window size.
+        for (RLMTableColumn *column in self.tableColumns) {
+            if (column.hidden) {
+                continue;
+            }
+
+            // Widths are fitted once per class: revisiting one (or coming back from a
+            // link, an array or a search) reuses what was measured the first time.
+            NSString *cacheKey = [self fittedWidthKeyForColumn:column];
+            NSNumber *fittedWidth = (cacheKey != nil) ? fittedColumnWidths[cacheKey] : nil;
+            if (fittedWidth != nil) {
+                [self applyFittedWidth:fittedWidth.doubleValue toColumn:column];
+                continue;
+            }
+
+            CGFloat width = MIN([column widthThatFitsRows:rowRange], kMaxNaturalColumnWidth);
+            [self applyFittedWidth:width toColumn:column];
+            [self setFittedWidth:width forColumn:column];
         }
 
-        // Widths are fitted once per class: revisiting one (or coming back from a
-        // link, an array or a search) reuses what was measured the first time.
-        NSString *cacheKey = [self fittedWidthKeyForColumn:column];
-        NSNumber *fittedWidth = (cacheKey != nil) ? fittedColumnWidths[cacheKey] : nil;
-        if (fittedWidth != nil) {
-            [self applyFittedWidth:fittedWidth.doubleValue toColumn:column];
-            continue;
+        applyingFittedWidths = NO;
+        self.autosaveTableColumns = wasAutosavingColumns;
+        if (widthsChanged) {
+            [self settleColumnGeometry];
+
+            // Done once rather than per column: -columnDidResize: rebuilds every header
+            // tooltip rect and repaints every row, and a wide class would otherwise pay
+            // for that once per column.
+            [self updateHeaderToolTipRects];
+            [self redrawAllRows];
         }
-
-        CGFloat width = MIN([column widthThatFitsRows:rowRange], kMaxNaturalColumnWidth);
-        [self applyFittedWidth:width toColumn:column];
-        [self setFittedWidth:width forColumn:column];
-    }
-
-    applyingFittedWidths = NO;
-    self.autosaveTableColumns = wasAutosavingColumns;
-    if (widthsChanged) {
-        // The columns are their final width now, so the table is its final width too:
-        // re-tile so it takes that size in this pass. Without it AppKit converges on the
-        // new width over the next several frames, which reads as the columns sliding.
-        [self tile];
-        [self.enclosingScrollView tile];
-
-        // Done once rather than per column: -columnDidResize: rebuilds every header
-        // tooltip rect and repaints every row, and a wide class would otherwise pay
-        // for that once per column.
-        [self updateHeaderToolTipRects];
-        [self redrawAllRows];
-    }
+    });
 }
 
 // Assigning a column width is expensive — AppKit re-tiles every column after it and
@@ -749,6 +822,31 @@ static const NSInteger kMaxRowsToMeasureForFit = 20;
         fittedColumnWidths = [NSMutableDictionary dictionary];
     }
     fittedColumnWidths[key] = @(width);
+}
+
+- (void)disableColumnAnimationOnScrollView
+{
+    NSDictionary<NSAnimatablePropertyKey, id> *disabledAnimations = RLMDisabledViewAnimations();
+    self.animations = disabledAnimations;
+    self.headerView.animations = disabledAnimations;
+    self.enclosingScrollView.animations = disabledAnimations;
+    self.enclosingScrollView.contentView.animations = disabledAnimations;
+}
+
+- (void)settleColumnGeometry
+{
+    [self disableColumnAnimationOnScrollView];
+
+    // The columns are in their final hidden/title/width state now, so make AppKit
+    // settle the table, clip view and header before the current transaction commits.
+    // Otherwise the layer-backed header can briefly present the new titles using
+    // stale column frames, which reads as the titles sliding around on appear.
+    [self tile];
+    [self.enclosingScrollView tile];
+    [self layoutSubtreeIfNeeded];
+    [self.headerView layoutSubtreeIfNeeded];
+    [self.headerView setNeedsDisplay:YES];
+    [self.headerView displayIfNeeded];
 }
 
 #pragma mark - Private Methods - Cell geometry
