@@ -88,6 +88,7 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
 @interface RLMDrawnRowViewTests : XCTestCase
 @property (nonatomic, strong) NSWindow *window;          // keeps the offscreen view hierarchy alive
 @property (nonatomic, strong) RLMDrawnRowViewTestHost *host;
+@property (nonatomic, strong) RLMRealmNode *realmNode;
 @end
 
 @implementation RLMDrawnRowViewTests
@@ -318,8 +319,13 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
 // Builds a controller showing `classNode` inside an offscreen window, with row views made.
 - (RLMInstanceTableViewController *)hostedControllerForClassNode:(RLMClassNode *)classNode
 {
+    return [self hostedControllerForClassNode:classNode height:400.0];
+}
+
+- (RLMInstanceTableViewController *)hostedControllerForClassNode:(RLMClassNode *)classNode height:(CGFloat)height
+{
     RLMInstanceTableViewController *controller = [[RLMInstanceTableViewController alloc] init];
-    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 900, 400)
+    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 900, height)
                                               styleMask:NSWindowStyleMaskBorderless
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
@@ -409,6 +415,154 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
     XCTAssertEqual(first.accessibilityParent, rowView);
     XCTAssertTrue(NSEqualRects(first.accessibilityFrameInParentSpace,
                                [self cellRectOfRowView:rowView tableView:tableView column:0 row:0]));
+}
+
+#pragma mark - Column auto-fit
+
+// A realm holding one RealmTestClass1 per string, opened through RLMRealmNode.
+- (RLMClassNode *)classNodeForStringValues:(NSArray<NSString *> *)strings
+{
+    NSString *fileName = [NSString stringWithFormat:@"%@.realm", [[NSUUID UUID] UUIDString]];
+    NSURL *fileURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+    @autoreleasepool {
+        RLMRealmConfiguration *configuration = [[RLMRealmConfiguration alloc] init];
+        configuration.fileURL = fileURL;
+        configuration.objectClasses = @[[RealmTestClass1 class], [RealmTestClass0 class]];
+        RLMRealm *realm = [RLMRealm realmWithConfiguration:configuration error:nil];
+        [realm transactionWithBlock:^{
+            for (NSString *string in strings) {
+                [RealmTestClass1 createInRealm:realm withValue:@{@"integerValue": @0,
+                                                                 @"boolValue": @NO,
+                                                                 @"floatValue": @0.0f,
+                                                                 @"doubleValue": @0.0,
+                                                                 @"stringValue": string,
+                                                                 @"dateValue": [NSDate date]}];
+            }
+        }];
+    }
+
+    self.realmNode = [[RLMRealmNode alloc] initWithFileURL:fileURL];
+    NSError *error = nil;
+    XCTAssertTrue([self.realmNode connect:&error], @"connect failed: %@", error);
+    for (RLMClassNode *node in self.realmNode.topLevelClasses) {
+        if ([node.name isEqualToString:[RealmTestClass1 className]]) { return node; }
+    }
+    return nil;
+}
+
+- (RLMClassNode *)classNodeNamed:(NSString *)name
+{
+    for (RLMClassNode *node in self.realmNode.topLevelClasses) {
+        if ([node.name isEqualToString:name]) { return node; }
+    }
+    return nil;
+}
+
+- (RLMTableColumn *)stringColumnOfTableView:(NSTableView *)tableView
+{
+    NSInteger index = [tableView columnWithIdentifier:@"stringValue"];
+    XCTAssertGreaterThanOrEqual(index, 0);
+    return index < 0 ? nil : (RLMTableColumn *)tableView.tableColumns[index];
+}
+
+- (void)testAutoFitMeasuresAtMostTwentyRows
+{
+    NSMutableArray<NSString *> *strings = [NSMutableArray array];
+    for (NSInteger row = 0; row < 40; row++) {
+        [strings addObject:(row < 20) ? @"ab" : [@"" stringByPaddingToLength:200 withString:@"W" startingAtIndex:0]];
+    }
+    RLMClassNode *classNode = [self classNodeForStringValues:strings];
+    XCTAssertNotNil(classNode);
+
+    // Tall enough that all 40 rows are on screen, so only the cap can exclude them.
+    RLMInstanceTableViewController *controller = [self hostedControllerForClassNode:classNode height:1000.0];
+    RLMTableView *tableView = controller.realmTableView;
+    XCTAssertGreaterThanOrEqual([tableView rowsInRect:tableView.visibleRect].length, 40u);
+
+    [tableView sizeColumnsToFitOnscreenContents];
+
+    RLMTableColumn *column = [self stringColumnOfTableView:tableView];
+    CGFloat widthForTwentyRows = [column widthThatFitsRows:NSMakeRange(0, 20)];
+    CGFloat widthForAllRows = [column widthThatFitsRows:NSMakeRange(0, 40)];
+    XCTAssertLessThan(widthForTwentyRows, widthForAllRows, @"fixture must distinguish the two");
+    XCTAssertEqual(column.width, widthForTwentyRows, @"long values below row 20 must not widen the column");
+}
+
+- (void)testAutoFitReusesTheWidthAlreadyFittedForAClass
+{
+    RLMClassNode *classNode = [self classNodeForStringValues:@[@"ab", @"cd", @"ef"]];
+    XCTAssertNotNil(classNode);
+    RLMInstanceTableViewController *controller = [self hostedControllerForClassNode:classNode height:400.0];
+    RLMTableView *tableView = controller.realmTableView;
+
+    [tableView sizeColumnsToFitOnscreenContents];
+    CGFloat fittedWidth = [self stringColumnOfTableView:tableView].width;
+
+    // A value that would widen the column if it were measured again.
+    RLMRealm *realm = self.realmNode.realm;
+    [realm transactionWithBlock:^{
+        [classNode instanceAtIndex:0][@"stringValue"] = [@"" stringByPaddingToLength:300 withString:@"W" startingAtIndex:0];
+    }];
+    RLMTableColumn *column = [self stringColumnOfTableView:tableView];
+    XCTAssertGreaterThan([column widthThatFitsRows:NSMakeRange(0, 3)], fittedWidth, @"a re-measure would widen it");
+
+    [tableView setupColumnsWithType:classNode];
+    [tableView sizeColumnsToFitOnscreenContents];
+
+    XCTAssertEqual([self stringColumnOfTableView:tableView].width, fittedWidth,
+                   @"returning to a class reuses its fitted widths instead of measuring again");
+}
+
+- (void)testColumnSetupRestoresTheWidthAlreadyFittedForAClass
+{
+    // Long enough that the fitted width is well above the default width for a string column.
+    NSString *longish = [@"" stringByPaddingToLength:40 withString:@"W" startingAtIndex:0];
+    RLMClassNode *classNode = [self classNodeForStringValues:@[longish, longish, longish]];
+    XCTAssertNotNil(classNode);
+    RLMInstanceTableViewController *controller = [self hostedControllerForClassNode:classNode height:400.0];
+    RLMTableView *tableView = controller.realmTableView;
+
+    [tableView sizeColumnsToFitOnscreenContents];
+    CGFloat fittedWidth = [self stringColumnOfTableView:tableView].width;
+    XCTAssertGreaterThan(fittedWidth, 128.0, @"fixture must fit wider than the default string column");
+
+    // Leave for another class and come back, so the columns are genuinely rebuilt
+    // (the same-signature path never touches widths). Re-applying the fitted width
+    // here is what leaves the auto-fit pass with nothing to assign.
+    RLMClassNode *otherNode = [self classNodeNamed:[RealmTestClass0 className]];
+    XCTAssertNotNil(otherNode);
+    [tableView setupColumnsWithType:otherNode];
+    [tableView setupColumnsWithType:classNode];
+
+    XCTAssertEqual([self stringColumnOfTableView:tableView].width, fittedWidth,
+                   @"column setup restores the fitted width instead of the default");
+}
+
+- (void)testAutoFitMarksRowsForRedrawWhenColumnWidthsChange
+{
+    RLMClassNode *classNode = [self classNodeForStringValues:@[@"ab", @"cd", @"ef"]];
+    XCTAssertNotNil(classNode);
+    RLMInstanceTableViewController *controller = [self hostedControllerForClassNode:classNode height:400.0];
+    RLMTableView *tableView = controller.realmTableView;
+
+    // Force widths that the fit will have to change, then take a clean baseline.
+    for (NSTableColumn *column in tableView.tableColumns) {
+        if (!column.hidden) { column.width = 300.0; }
+    }
+    [tableView enumerateAvailableRowViewsUsingBlock:^(NSTableRowView *rowView, NSInteger row) {
+        [rowView displayIfNeeded];
+    }];
+
+    [tableView sizeColumnsToFitOnscreenContents];
+
+    XCTAssertNotEqual([self stringColumnOfTableView:tableView].width, 300.0, @"the fit must have changed a width");
+    __block NSInteger rowsMarked = 0, rowsSeen = 0;
+    [tableView enumerateAvailableRowViewsUsingBlock:^(NSTableRowView *rowView, NSInteger row) {
+        rowsSeen++;
+        if (rowView.needsDisplay) { rowsMarked++; }
+    }];
+    XCTAssertGreaterThan(rowsSeen, 0);
+    XCTAssertEqual(rowsMarked, rowsSeen, @"moving columns must repaint every row, whatever coalesces the resizes");
 }
 
 @end

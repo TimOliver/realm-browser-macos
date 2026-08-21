@@ -32,6 +32,10 @@ const NSInteger NOT_A_COLUMN = -1;
     RLMTableLocation currentMouseLocation;
     RLMTableLocation previousMouseLocation;
     NSString *currentColumnSignature;
+    NSString *currentTypeName;
+    BOOL applyingFittedWidths;
+    BOOL widthsChanged;
+    NSMutableDictionary<NSString *, NSNumber *> *fittedColumnWidths;
 
     NSMenuItem *clickLockItem;
 
@@ -489,6 +493,7 @@ enum MenuTags {
 {
     BOOL isArray = [typeNode isMemberOfClass:[RLMArrayNode class]];
     NSArray *newPropertyColumns = typeNode.propertyColumns;
+    currentTypeName = typeNode.name;
 
     // Rebuilding NSTableView columns is one of the most expensive parts of a
     // navigation, and most navigations (link clicks, queries, back/forward within
@@ -575,7 +580,11 @@ enum MenuTags {
             default:
                 break;
         }
-        tableColumn.width = initialWidth;
+        // A width already fitted for this class is restored here, inside the batched
+        // column update, so the auto-fit pass afterwards has nothing left to assign.
+        NSString *fittedKey = [self fittedWidthKeyForColumn:tableColumn];
+        NSNumber *fittedWidth = (fittedKey != nil) ? fittedColumnWidths[fittedKey] : nil;
+        tableColumn.width = (fittedWidth != nil) ? fittedWidth.doubleValue : initialWidth;
     }
 
     // Park the rest of the pool out of sight, under identifiers that cannot
@@ -613,6 +622,10 @@ enum MenuTags {
 
 - (void)columnDidResize:(NSNotification *)notification
 {
+    // While auto-fitting, the same work is done once at the end of the pass.
+    if (applyingFittedWidths) {
+        return;
+    }
     [self updateHeaderToolTipRects];
     [self redrawAllRows];
 }
@@ -641,6 +654,7 @@ enum MenuTags {
 // A single long value must not consume the whole window when deriving a
 // column's natural width from its content.
 static const CGFloat kMaxNaturalColumnWidth = 400.0;
+static const NSInteger kMaxRowsToMeasureForFit = 20;
 
 - (void)sizeColumnsToFitOnscreenContents
 {
@@ -648,18 +662,87 @@ static const CGFloat kMaxNaturalColumnWidth = 400.0;
     // empty, so fall back to the first screenful.
     NSRange rowRange = [self rowsInRect:self.visibleRect];
     if (rowRange.length == 0) {
-        rowRange = NSMakeRange(0, (NSUInteger)MIN((NSInteger)50, self.numberOfRows));
+        rowRange = NSMakeRange(0, (NSUInteger)MIN((NSInteger)kMaxRowsToMeasureForFit, self.numberOfRows));
     }
+    // Measuring a cell costs roughly as much as drawing a whole row, so the number
+    // measured per column is capped: a maximised window would otherwise measure a
+    // full screenful of rows for every column on every navigation.
+    rowRange.length = MIN(rowRange.length, (NSUInteger)kMaxRowsToMeasureForFit);
+
+    // Column width changes synchronously write the table's autosave state; the fit
+    // would otherwise pay for that once per column.
+    BOOL wasAutosavingColumns = self.autosaveTableColumns;
+    self.autosaveTableColumns = NO;
+    applyingFittedWidths = YES;
+    widthsChanged = NO;
+    // Batched: AppKit re-tiles the columns after each individual width change, which
+    // for a wide class costs several times what the measuring does.
+    [self beginUpdates];
 
     // Each column gets exactly its natural width — the header title plus the
-    // widest cell among the on-screen rows. No fill-out: a column of nils stays
+    // widest cell among the measured rows. No fill-out: a column of nils stays
     // as narrow as its title, regardless of the window size.
     for (RLMTableColumn *column in self.tableColumns) {
         if (column.hidden) {
             continue;
         }
-        column.width = MIN([column widthThatFitsRows:rowRange], kMaxNaturalColumnWidth);
+
+        // Widths are fitted once per class: revisiting one (or coming back from a
+        // link, an array or a search) reuses what was measured the first time.
+        NSString *cacheKey = [self fittedWidthKeyForColumn:column];
+        NSNumber *fittedWidth = (cacheKey != nil) ? fittedColumnWidths[cacheKey] : nil;
+        if (fittedWidth != nil) {
+            [self applyFittedWidth:fittedWidth.doubleValue toColumn:column];
+            continue;
+        }
+
+        CGFloat width = MIN([column widthThatFitsRows:rowRange], kMaxNaturalColumnWidth);
+        [self applyFittedWidth:width toColumn:column];
+        [self setFittedWidth:width forColumn:column];
     }
+
+    [self endUpdates];
+    applyingFittedWidths = NO;
+    self.autosaveTableColumns = wasAutosavingColumns;
+    if (widthsChanged) {
+        // Done once rather than per column: -columnDidResize: rebuilds every header
+        // tooltip rect and repaints every row, and a wide class would otherwise pay
+        // for that once per column.
+        [self updateHeaderToolTipRects];
+        [self redrawAllRows];
+    }
+}
+
+// Assigning a column width is expensive — AppKit re-tiles every column after it and
+// writes the table's autosave state — so widths that already match are left alone.
+- (void)applyFittedWidth:(CGFloat)width toColumn:(RLMTableColumn *)column
+{
+    if (column.width == width) {
+        return;
+    }
+    column.width = width;
+    widthsChanged = YES;
+}
+
+// nil until the columns have been set up for a type, which is what the widths belong to.
+- (NSString *)fittedWidthKeyForColumn:(RLMTableColumn *)column
+{
+    if (currentTypeName == nil || column.identifier == nil) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"%@|%@", currentTypeName, column.identifier];
+}
+
+- (void)setFittedWidth:(CGFloat)width forColumn:(RLMTableColumn *)column
+{
+    NSString *key = [self fittedWidthKeyForColumn:column];
+    if (key == nil) {
+        return;
+    }
+    if (fittedColumnWidths == nil) {
+        fittedColumnWidths = [NSMutableDictionary dictionary];
+    }
+    fittedColumnWidths[key] = @(width);
 }
 
 #pragma mark - Private Methods - Cell geometry

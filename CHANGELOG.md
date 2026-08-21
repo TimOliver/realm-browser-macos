@@ -1,5 +1,6 @@
 4.0.0 Release notes (in progress)
 =============================================================
+* Column widths are fitted once per class and re-applied on later visits, and the fit measures at most 20 rows with its resize side effects batched; switching between wide classes (27 columns) at fullscreen went from ~33 ms to ~0 ms of column fitting.
 * Instance table rows now draw their columns directly instead of hosting one cell view per cell; switching classes with 42 visible rows x 20 columns went from ~218 ms to ~0.2 ms of synchronous work (macOS 26.6.2, Xcode 26.4, Debug build, offscreen harness).
 
 3.0.1 Release notes (2017-11-03)
