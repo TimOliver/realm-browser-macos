@@ -145,7 +145,6 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     [super performUpdateUsingState:newState oldState:oldState];
 
     [self discardInlineEditing];
-    [self.tableView setAutosaveTableColumns:NO];
     
     RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
     NSInteger selectionIndex = NSNotFound;

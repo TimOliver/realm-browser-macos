@@ -43,6 +43,8 @@
 // Private hook used to verify that a schema switch and its auto-fit produce one
 // committed geometry state rather than presenting the pre-fit widths first.
 @interface RLMTableView (RLMDrawnRowViewTests)
+- (void)setupColumnsWithType:(RLMTypeNode *)typeNode;
+- (void)sizeColumnsToFitOnscreenContents;
 - (void)settleColumnGeometry;
 @end
 
@@ -619,15 +621,19 @@ static NSRect RLMInkBoundsInColumnSpan(NSView *view, NSRect rect)
     RLMInstanceTableViewController *controller = [[RLMInstanceTableViewController alloc] init];
     controller.displayedType = classNode;
 
-    RLMSettlementCountingTableView *tableView = [[RLMSettlementCountingTableView alloc] initWithFrame:NSMakeRect(0, 0, 900, 400)];
+    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 900, 400)];
+    RLMSettlementCountingTableView *tableView = [[RLMSettlementCountingTableView alloc] initWithFrame:scrollView.bounds];
     tableView.dataSource = controller;
     tableView.delegate = controller;
+    scrollView.documentView = tableView;
 
     [tableView setupColumnsWithType:classNode autosaveName:@"test.atomic-column-transition"];
 
     XCTAssertEqual(tableView.settlementCount, 1u);
     XCTAssertTrue(tableView.autosaveTableColumns);
     XCTAssertEqualObjects(tableView.autosaveName, @"test.atomic-column-transition");
+    XCTAssertNotEqualObjects(scrollView.contentView.animations[@"boundsOrigin"], [NSNull null],
+                             @"column transitions must not disable the table's scrolling animation");
 }
 
 - (void)testAutoFitMarksRowsForRedrawWhenColumnWidthsChange

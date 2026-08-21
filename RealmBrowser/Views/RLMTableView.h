@@ -107,16 +107,9 @@ typedef struct {
 
 - (void)scrollToRow:(NSInteger)rowIndex;
 
-- (void)setupColumnsWithType:(RLMTypeNode *)typeNode;
-
 // Configures a new schema, restores its autosaved state, fits uncached widths and
 // commits the resulting geometry as one visual transition.
 - (void)setupColumnsWithType:(RLMTypeNode *)typeNode autosaveName:(NSString *)autosaveName;
-
-// Sizes every visible column to its content: the header title plus the widest
-// on-screen cell, capped. No fill-out — a sparse column stays as narrow as its
-// title regardless of window size. One-shot; called after navigation.
-- (void)sizeColumnsToFitOnscreenContents;
 
 // Rows draw their own content (RLMDrawnRowView), so data changes are surfaced by
 // redrawing row views rather than reloading cell views.
