@@ -17,3 +17,31 @@
 ////////////////////////////////////////////////////////////////////////////
 
 @import Cocoa;
+
+@class RLMCellContent;
+@class RLMDrawnRowView;
+
+// Reuse identifier for -[NSTableView makeViewWithIdentifier:owner:].
+extern NSString * const RLMDrawnRowViewReuseIdentifier;
+
+@protocol RLMDrawnRowViewDataSource <NSObject>
+
+// Content of one cell. Called during drawing for every visible column of a row, so it
+// must be cheap (read the value, format it); return nil to draw nothing.
+- (RLMCellContent *)rowView:(RLMDrawnRowView *)rowView contentForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row;
+
+@end
+
+// One view per row that draws every column itself. The table hosts no cell views at all,
+// which is what keeps populating a screenful of rows cheap: the per-view overhead of
+// AppKit (layout engine, key view loop, layer commit) is paid per row, not per cell.
+@interface RLMDrawnRowView : NSTableRowView
+
+@property (nonatomic, weak) NSTableView *tableView;
+@property (nonatomic, weak) id<RLMDrawnRowViewDataSource> contentDataSource;
+
+// Shared text style, also used by RLMTableColumn to measure content widths.
++ (NSFont *)cellTextFont;
++ (CGFloat)cellTextHeight;
+
+@end
