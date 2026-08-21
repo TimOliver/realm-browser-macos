@@ -71,8 +71,6 @@ static void RLMPerformWithoutAnimations(void (^changes)(void))
     BOOL columnGeometryNeedsSettling;
     NSMutableDictionary<NSString *, NSNumber *> *fittedColumnWidths;
 
-    NSMenuItem *clickLockItem;
-
     NSMenuItem *deleteObjectItem;
     NSMenuItem *copyValueItem;
 
@@ -134,7 +132,6 @@ static void RLMPerformWithoutAnimations(void (^changes)(void))
 #pragma mark - Private Methods - NSObject Overrides
 
 enum MenuTags {
-    MENU_CONTEXT_CLICK_LOCK_ICON_TO_EDIT = 99,
     MENU_CONTEXT_DELETE_OBJECTS = 200,
     MENU_CONTEXT_COPY_VALUE = 201,
 
@@ -154,13 +151,7 @@ enum MenuTags {
     NSMenu *rightClickMenu = [[NSMenu alloc] initWithTitle:@"Contextual Menu"];
     self.menu = rightClickMenu;
     self.menu.delegate = self;
-    
-    // This single menu item alerts the user that the realm is locked for editing
-    clickLockItem = [[NSMenuItem alloc] initWithTitle:@"Click lock icon to edit"
-                                               action:nil
-                                        keyEquivalent:@""];
-    clickLockItem.tag = MENU_CONTEXT_CLICK_LOCK_ICON_TO_EDIT;
-    
+
     // Operations on objects in class tables
     deleteObjectItem = [[NSMenuItem alloc] initWithTitle:@"Delete objects"
                                                   action:@selector(deleteObjectsAction:)
@@ -344,9 +335,6 @@ enum MenuTags {
     NSString *numberModifier = multipleSelection ? @"s" : @"";
 
     switch (menuItem.tag) {
-        case MENU_CONTEXT_CLICK_LOCK_ICON_TO_EDIT: // Retired click-lock hint
-            return NO;
-
         case 100: // Edit -> Delete object
         case MENU_CONTEXT_DELETE_OBJECTS: // Context -> Delete object
             menuItem.title = [NSString stringWithFormat:@"Delete object%@", numberModifier];
