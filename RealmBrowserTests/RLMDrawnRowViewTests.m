@@ -40,6 +40,10 @@
 - (void)discardInlineEditing;
 @end
 
+@interface RLMDrawnRowView (RLMDrawnRowViewTests)
++ (NSColor *)textColorForKind:(RLMCellContentKind)kind placeholder:(BOOL)placeholder emphasized:(BOOL)emphasized;
+@end
+
 // Private hook used to verify that a schema switch and its auto-fit produce one
 // committed geometry state rather than presenting the pre-fit widths first.
 @interface RLMTableView (RLMDrawnRowViewTests)
@@ -257,6 +261,8 @@ static NSRect RLMInkBoundsInColumnSpan(NSView *view, NSRect rect)
 {
     XCTAssertEqualObjects([RLMDrawnRowView cellTextFont], [NSFont monospacedDigitSystemFontOfSize:12.0 weight:NSFontWeightRegular]);
     XCTAssertGreaterThan([RLMDrawnRowView cellTextHeight], 10.0);
+    XCTAssertEqualObjects([RLMDrawnRowView textColorForKind:RLMCellContentKindLink placeholder:NO emphasized:NO],
+                          NSColor.controlAccentColor);
     XCTAssertEqualObjects(RLMDrawnRowViewReuseIdentifier, @"RLMDrawnRowView");
 }
 

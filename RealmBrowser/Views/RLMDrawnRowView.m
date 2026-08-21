@@ -71,7 +71,7 @@ static const CGFloat kBadgeGap = 4.0;
         return NSColor.placeholderTextColor;
     }
     if (kind == RLMCellContentKindLink) {
-        return NSColor.linkColor;
+        return NSColor.controlAccentColor;
     }
     return NSColor.labelColor;
 }

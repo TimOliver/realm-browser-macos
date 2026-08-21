@@ -20,7 +20,6 @@
 
 @interface NSColor (ByteSizeFactory)
 
-+ (NSColor *)linkColor;
 + (NSColor *)colorWithByteRed:(NSUInteger)red green:(NSUInteger)green blue:(NSUInteger)blue alpha:(NSUInteger)alpha;
 + (NSColor *)colorWithByteWhite:(NSUInteger)white alpha:(NSUInteger)alpha;
 + (NSColor *)colorWithRGBAFloatValues:(CGFloat *)values;
