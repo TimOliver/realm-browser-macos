@@ -76,7 +76,7 @@ static const CGFloat kBadgeGap = 4.0;
     return NSColor.labelColor;
 }
 
-// Laid-out lines, keyed by the text and whether it is underlined. Building a line is
+// Laid-out lines, keyed by their text. Building a line is
 // the expensive half of drawing a cell, and a table redraws the same values over and
 // over — on scroll, on selection changes, on every navigation back to a class.
 // The lines carry no colour (see kCTForegroundColorFromContextAttributeName below), so
@@ -92,29 +92,34 @@ static const CGFloat kBadgeGap = 4.0;
     return cache;
 }
 
-+ (CTLineRef)lineForText:(NSString *)text underlined:(BOOL)underlined
++ (NSDictionary *)lineAttributes
+{
+    static NSDictionary *attributes;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        attributes = @{NSFontAttributeName: [self cellTextFont],
+                       // Take the colour from the context at draw time, so one line can be
+                       // shared between every colour a cell is drawn in.
+                       (id)kCTForegroundColorFromContextAttributeName: @YES};
+    });
+    return attributes;
+}
+
++ (CTLineRef)lineForText:(NSString *)text
 {
     NSCache *cache = [self lineCache];
-    NSString *key = [(underlined ? @"1" : @"0") stringByAppendingString:text];
-    id cached = [cache objectForKey:key];
+    id cached = [cache objectForKey:text];
     if (cached != nil) {
         return (__bridge CTLineRef)cached;
     }
 
-    NSMutableDictionary *attributes = [@{NSFontAttributeName: [self cellTextFont],
-                                         // Take the colour from the context at draw time, so the
-                                         // line can be shared between every colour a cell uses.
-                                         (id)kCTForegroundColorFromContextAttributeName: @YES} mutableCopy];
-    if (underlined) {
-        attributes[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
-    }
-    NSAttributedString *attributed = [[NSAttributedString alloc] initWithString:text attributes:attributes];
+    NSAttributedString *attributed = [[NSAttributedString alloc] initWithString:text attributes:[self lineAttributes]];
     CTLineRef line = CTLineCreateWithAttributedString((CFAttributedStringRef)attributed);
     if (line == NULL) {
         return NULL;
     }
-    [cache setObject:(__bridge_transfer id)line forKey:key];
-    return (__bridge CTLineRef)[cache objectForKey:key];
+    [cache setObject:(__bridge_transfer id)line forKey:[text copy]];
+    return (__bridge CTLineRef)[cache objectForKey:text];
 }
 
 #pragma mark - Redraw on selection changes
@@ -129,6 +134,16 @@ static const CGFloat kBadgeGap = 4.0;
 {
     [super setEmphasized:emphasized];
     [self setNeedsDisplay:YES];
+}
+
+#pragma mark - Layer behaviour
+
+// A row's whole content changes whenever the table shows a different class, and a
+// layer-backed view animates a contents change by default -- which reads as the table
+// crossfading, and delays the frame by the length of the implicit animation.
+- (id<CAAction>)actionForLayer:(CALayer *)layer forKey:(NSString *)event
+{
+    return (id<CAAction>)[NSNull null];
 }
 
 #pragma mark - Drawing
@@ -203,8 +218,7 @@ static const CGFloat kBadgeGap = 4.0;
     if (NSWidth(rect) <= 0.0) {
         return;
     }
-    BOOL underlined = (kind == RLMCellContentKindLink && !placeholder);
-    CTLineRef line = [RLMDrawnRowView lineForText:text underlined:underlined];
+    CTLineRef line = [RLMDrawnRowView lineForText:text];
     if (line == NULL) {
         return;
     }
@@ -213,7 +227,7 @@ static const CGFloat kBadgeGap = 4.0;
     CTLineRef lineToDraw = line;
     CTLineRef truncated = NULL;
     if (CTLineGetTypographicBounds(line, NULL, NULL, NULL) > NSWidth(rect)) {
-        truncated = [RLMDrawnRowView truncatedLineFor:line width:NSWidth(rect) underlined:underlined];
+        truncated = [RLMDrawnRowView truncatedLineFor:line width:NSWidth(rect)];
         if (truncated == NULL) {
             return;
         }
@@ -240,26 +254,15 @@ static const CGFloat kBadgeGap = 4.0;
 }
 
 // Caller owns the returned line. NULL when not even the ellipsis fits.
-+ (CTLineRef)truncatedLineFor:(CTLineRef)line width:(CGFloat)width underlined:(BOOL)underlined
++ (CTLineRef)truncatedLineFor:(CTLineRef)line width:(CGFloat)width
 {
-    static NSMutableDictionary<NSString *, id> *tokens;
+    static CTLineRef token;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        tokens = [NSMutableDictionary dictionary];
+        NSAttributedString *ellipsis = [[NSAttributedString alloc] initWithString:@"\u2026"
+                                                                       attributes:[self lineAttributes]];
+        token = CTLineCreateWithAttributedString((CFAttributedStringRef)ellipsis);
     });
-
-    NSString *key = underlined ? @"1" : @"0";
-    CTLineRef token = (__bridge CTLineRef)tokens[key];
-    if (token == NULL) {
-        NSMutableDictionary *attributes = [@{NSFontAttributeName: [self cellTextFont],
-                                             (id)kCTForegroundColorFromContextAttributeName: @YES} mutableCopy];
-        if (underlined) {
-            attributes[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
-        }
-        NSAttributedString *ellipsis = [[NSAttributedString alloc] initWithString:@"\u2026" attributes:attributes];
-        tokens[key] = (__bridge_transfer id)CTLineCreateWithAttributedString((CFAttributedStringRef)ellipsis);
-        token = (__bridge CTLineRef)tokens[key];
-    }
     return CTLineCreateTruncatedLine(line, width, kCTLineTruncationEnd, token);
 }
 

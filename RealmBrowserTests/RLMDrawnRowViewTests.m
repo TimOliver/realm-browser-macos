@@ -621,7 +621,7 @@ static NSRect RLMInkBoundsInColumnSpan(NSView *view, NSRect rect)
     XCTAssertFalse(RLMViewHasInkInColumnSpan(rowView, [self cellRectOfRowView:rowView tableView:tableView column:1 row:0]));
 }
 
-- (void)testLinkTextIsUnderlined
+- (void)testLinkTextIsNotUnderlined
 {
     NSTableView *tableView = [self makeTableViewWithColumnCount:2 columnWidth:200.0];
     // No descenders, so any ink below the glyphs is the underline.
@@ -633,7 +633,9 @@ static NSRect RLMInkBoundsInColumnSpan(NSView *view, NSRect rect)
     NSRect linkInk = RLMInkBoundsInColumnSpan(rowView, [self cellRectOfRowView:rowView tableView:tableView column:1 row:0]);
     XCTAssertFalse(NSIsEmptyRect(plainInk));
     XCTAssertFalse(NSIsEmptyRect(linkInk));
-    XCTAssertGreaterThan(NSMaxY(linkInk), NSMaxY(plainInk), @"the underline puts ink below the same text unadorned");
+    XCTAssertEqualWithAccuracy(NSMaxY(linkInk), NSMaxY(plainInk), 1.0,
+                               @"a link is coloured, not underlined: it must not put ink below the glyphs");
+    XCTAssertEqualWithAccuracy(NSHeight(linkInk), NSHeight(plainInk), 1.0);
 }
 
 @end

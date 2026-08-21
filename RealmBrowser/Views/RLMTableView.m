@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+@import QuartzCore;
+
 #import "RLMTableView.h"
 #import "RLMTableColumn.h"
 #import "RLMArrayNode.h"
@@ -70,6 +72,8 @@ const NSInteger NOT_A_COLUMN = -1;
 
     [self createContextMenuItems];
     self.allowsColumnReordering = NO;
+
+
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(columnDidResize:)
@@ -535,7 +539,9 @@ enum MenuTags {
     // them.
     NSUInteger neededColumns = newPropertyColumns.count + (isArray ? 1 : 0);
 
-    [self beginUpdates];
+    // Deliberately not inside beginUpdates/endUpdates: that is NSTableView's animated
+    // batch-update API, so the pooled columns animate to the positions the new class
+    // gives them instead of simply being there when the table redraws.
     while ((NSUInteger)self.numberOfColumns < neededColumns) {
         RLMTableColumn *column = [[RLMTableColumn alloc] initWithIdentifier:[NSString stringWithFormat:@"pool.%ld", (long)self.numberOfColumns]];
         column.minWidth = 26.0;
@@ -553,7 +559,7 @@ enum MenuTags {
         tableColumn.classProperty = nil;
         tableColumn.title = @"#";
         tableColumn.headerToolTip = @"Order of object within array";
-        tableColumn.width = 64.0;
+        [self restoreFittedWidthForColumn:tableColumn];
     }
 
     for (RLMClassProperty *propertyColumn in newPropertyColumns) {
@@ -567,24 +573,7 @@ enum MenuTags {
         tableColumn.title = propertyColumn.name;
         tableColumn.headerToolTip = nil;
 
-        CGFloat initialWidth = 100.0;
-        switch (propertyColumn.type) {
-            case RLMPropertyTypeString:
-                initialWidth = 128.0;
-                break;
-            case RLMPropertyTypeInt:
-            case RLMPropertyTypeFloat:
-            case RLMPropertyTypeDouble:
-                initialWidth = 64.0;
-                break;
-            default:
-                break;
-        }
-        // A width already fitted for this class is restored here, inside the batched
-        // column update, so the auto-fit pass afterwards has nothing left to assign.
-        NSString *fittedKey = [self fittedWidthKeyForColumn:tableColumn];
-        NSNumber *fittedWidth = (fittedKey != nil) ? fittedColumnWidths[fittedKey] : nil;
-        tableColumn.width = (fittedWidth != nil) ? fittedWidth.doubleValue : initialWidth;
+        [self restoreFittedWidthForColumn:tableColumn];
     }
 
     // Park the rest of the pool out of sight, under identifiers that cannot
@@ -596,11 +585,10 @@ enum MenuTags {
         tableColumn.classProperty = nil;
     }
 
-    [self endUpdates];
-
     // Not reloadData: that purges the row reuse pool, and the rows would all be
     // rebuilt. The row count is updated and every visible row redraws its content.
     [self noteNumberOfRowsChanged];
+    [self tile];
     [self redrawAllRows];
 
     [self updateHeaderToolTipRects];
@@ -675,9 +663,10 @@ static const NSInteger kMaxRowsToMeasureForFit = 20;
     self.autosaveTableColumns = NO;
     applyingFittedWidths = YES;
     widthsChanged = NO;
-    // Batched: AppKit re-tiles the columns after each individual width change, which
-    // for a wide class costs several times what the measuring does.
-    [self beginUpdates];
+    // Deliberately not inside beginUpdates/endUpdates: that is NSTableView's animated
+    // batch-update API, and it animates the column geometry -- the header titles slide
+    // into their new positions. Assigning the widths plainly costs a little more, and
+    // is the reason the widths are cached per class so most navigations assign nothing.
 
     // Each column gets exactly its natural width — the header title plus the
     // widest cell among the measured rows. No fill-out: a column of nils stays
@@ -701,10 +690,15 @@ static const NSInteger kMaxRowsToMeasureForFit = 20;
         [self setFittedWidth:width forColumn:column];
     }
 
-    [self endUpdates];
     applyingFittedWidths = NO;
     self.autosaveTableColumns = wasAutosavingColumns;
     if (widthsChanged) {
+        // The columns are their final width now, so the table is its final width too:
+        // re-tile so it takes that size in this pass. Without it AppKit converges on the
+        // new width over the next several frames, which reads as the columns sliding.
+        [self tile];
+        [self.enclosingScrollView tile];
+
         // Done once rather than per column: -columnDidResize: rebuilds every header
         // tooltip rect and repaints every row, and a wide class would otherwise pay
         // for that once per column.
@@ -722,6 +716,18 @@ static const NSInteger kMaxRowsToMeasureForFit = 20;
     }
     column.width = width;
     widthsChanged = YES;
+}
+
+// Restores the width already fitted for this class, if there is one. Columns without a
+// remembered width are left alone here and sized once by the auto-fit pass that follows,
+// so no column is ever given a placeholder width and resized afterwards.
+- (void)restoreFittedWidthForColumn:(RLMTableColumn *)column
+{
+    NSString *key = [self fittedWidthKeyForColumn:column];
+    NSNumber *fittedWidth = (key != nil) ? fittedColumnWidths[key] : nil;
+    if (fittedWidth != nil) {
+        column.width = fittedWidth.doubleValue;
+    }
 }
 
 // nil until the columns have been set up for a type, which is what the widths belong to.
