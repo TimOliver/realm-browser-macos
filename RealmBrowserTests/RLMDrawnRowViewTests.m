@@ -371,4 +371,44 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
     XCTAssertNil(field.superview);
 }
 
+#pragma mark - Drag image and accessibility
+
+- (void)testDraggingImageIsASnapshotOfTheRow
+{
+    NSTableView *tableView = [self makeTableViewWithColumnCount:2 columnWidth:100.0];
+    self.host.contentsByColumn = @[[RLMCellContent textContent:@"a" showsNilPlaceholder:NO],
+                                   [RLMCellContent textContent:@"b" showsNilPlaceholder:NO]];
+    RLMDrawnRowView *rowView = (RLMDrawnRowView *)[tableView rowViewAtRow:0 makeIfNecessary:YES];
+
+    NSArray<NSDraggingImageComponent *> *components = rowView.draggingImageComponents;
+    XCTAssertEqual(components.count, 1u);
+    XCTAssertEqualObjects(components.firstObject.key, NSDraggingImageComponentIconKey);
+    XCTAssertTrue([components.firstObject.contents isKindOfClass:[NSImage class]]);
+    XCTAssertTrue(NSEqualSizes(components.firstObject.frame.size, rowView.bounds.size));
+}
+
+- (void)testAccessibilityChildrenDescribeVisibleColumns
+{
+    NSTableView *tableView = [self makeTableViewWithColumnCount:3 columnWidth:100.0];
+    tableView.tableColumns[1].hidden = YES;
+    tableView.tableColumns[0].title = @"name";
+    tableView.tableColumns[2].title = @"done";
+    self.host.contentsByColumn = @[[RLMCellContent textContent:@"Ada" showsNilPlaceholder:NO],
+                                   [RLMCellContent textContent:@"hidden" showsNilPlaceholder:NO],
+                                   [RLMCellContent boolContent:YES]];
+    NSTableRowView *rowView = [tableView rowViewAtRow:0 makeIfNecessary:YES];
+
+    NSArray *children = rowView.accessibilityChildren;
+    XCTAssertEqual(children.count, 2u);
+    NSAccessibilityElement *first = children[0];
+    NSAccessibilityElement *second = children[1];
+    XCTAssertEqualObjects(first.accessibilityLabel, @"name");
+    XCTAssertEqualObjects(first.accessibilityValue, @"Ada");
+    XCTAssertEqualObjects(second.accessibilityLabel, @"done");
+    XCTAssertEqualObjects(second.accessibilityValue, @"true");
+    XCTAssertEqual(first.accessibilityParent, rowView);
+    XCTAssertTrue(NSEqualRects(first.accessibilityFrameInParentSpace,
+                               [self cellRectOfRowView:rowView tableView:tableView column:0 row:0]));
+}
+
 @end

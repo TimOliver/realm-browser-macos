@@ -44,4 +44,9 @@ extern NSString * const RLMDrawnRowViewReuseIdentifier;
 + (NSFont *)cellTextFont;
 + (CGFloat)cellTextHeight;
 
+// AppKit declares this on NSTableCellView only, and builds a row's drag image from
+// the cell views it finds. There are none here, so the row snapshots itself; the
+// declaration is repeated so callers (and tests) can see it.
+@property (nonatomic, readonly, strong) NSArray<NSDraggingImageComponent *> *draggingImageComponents;
+
 @end

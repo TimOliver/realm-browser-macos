@@ -231,4 +231,56 @@ static const CGFloat kBadgeGap = 4.0;
     return width;
 }
 
+#pragma mark - Dragging
+
+// With no cell views the default drag image would be empty; snapshot the row instead.
+- (NSArray<NSDraggingImageComponent *> *)draggingImageComponents
+{
+    NSRect bounds = self.bounds;
+    NSBitmapImageRep *rep = [self bitmapImageRepForCachingDisplayInRect:bounds];
+    [self cacheDisplayInRect:bounds toBitmapImageRep:rep];
+    NSImage *image = [[NSImage alloc] initWithSize:bounds.size];
+    [image addRepresentation:rep];
+
+    NSDraggingImageComponent *component = [NSDraggingImageComponent draggingImageComponentWithKey:NSDraggingImageComponentIconKey];
+    component.contents = image;
+    component.frame = bounds;
+    return @[component];
+}
+
+#pragma mark - Accessibility
+
+// Expose one element per visible column so VoiceOver can still navigate cells.
+- (NSArray *)accessibilityChildren
+{
+    NSTableView *tableView = self.tableView;
+    id<RLMDrawnRowViewDataSource> dataSource = self.contentDataSource;
+    NSInteger row = (tableView != nil) ? [tableView rowForView:self] : -1;
+    if (dataSource == nil || row < 0) {
+        return @[];
+    }
+
+    NSMutableArray *children = [NSMutableArray array];
+    NSArray<NSTableColumn *> *columns = tableView.tableColumns;
+    for (NSUInteger columnIndex = 0; columnIndex < columns.count; columnIndex++) {
+        NSTableColumn *column = columns[columnIndex];
+        if (column.hidden) {
+            continue;
+        }
+        NSRect cellRect = [self convertRect:[tableView frameOfCellAtColumn:(NSInteger)columnIndex row:row] fromView:tableView];
+        RLMCellContent *content = [dataSource rowView:self contentForTableColumn:column row:row];
+        // The convenience constructor's frame is in screen coordinates; the cell rect is
+        // row-local, so it is handed over as the parent-space frame instead and AppKit
+        // converts it (and keeps converting it when the window moves).
+        NSAccessibilityElement *element = [NSAccessibilityElement accessibilityElementWithRole:NSAccessibilityCellRole
+                                                                                        frame:NSZeroRect
+                                                                                        label:column.title
+                                                                                       parent:self];
+        element.accessibilityFrameInParentSpace = cellRect;
+        element.accessibilityValue = [content accessibilityValueString] ?: @"";
+        [children addObject:element];
+    }
+    return children;
+}
+
 @end
