@@ -23,7 +23,7 @@
                         <rect key="frame" x="0.0" y="0.0" width="700" height="400"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <tableView focusRingType="none" verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="none" alternatingRowBackgroundColors="YES" autosaveName="InstanceTable" rowHeight="18" headerView="cDp-e2-1cA" id="enp-HN-e6b" customClass="RLMTableView">
+                            <tableView focusRingType="none" verticalHuggingPriority="750" columnAutoresizingStyle="none" alternatingRowBackgroundColors="YES" autosaveName="InstanceTable" rowHeight="18" headerView="cDp-e2-1cA" id="enp-HN-e6b" customClass="RLMTableView">
                                 <rect key="frame" x="0.0" y="0.0" width="700" height="377"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <size key="intercellSpacing" width="10" height="2"/>

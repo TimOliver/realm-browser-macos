@@ -24,11 +24,6 @@
 #import "RLMArrayNode.h"
 #import "RLMRealmNode.h"
 
-#import "RLMBadgeTableCellView.h"
-#import "RLMBasicTableCellView.h"
-#import "RLMBoolTableCellView.h"
-#import "RLMNumberTableCellView.h"
-#import "RLMImageTableCellView.h"
 
 #import "RLMTableColumn.h"
 

@@ -17,14 +17,12 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #import "RLMTableColumn.h"
-#import "RLMTableCellView.h"
+#import "RLMDrawnRowView.h"
 #import "RLMTableView.h"
 #import "RLMClassProperty.h"
 #import "RLMDescriptions.h"
 
 @implementation RLMTableColumn
-
-@synthesize cellReuseIdentifier = _cellReuseIdentifier;
 
 const NSUInteger kMaxNumberOfRowsToConsider = 50;
 const CGFloat kMaxColumnWidth = 200.0;
@@ -34,18 +32,7 @@ const CGFloat kMaxColumnWidth = 200.0;
 - (void)setClassProperty:(RLMClassProperty *)classProperty
 {
     _classProperty = classProperty;
-    _cellReuseIdentifier = nil;
     self.cachedHeaderToolTip = nil;
-}
-
-- (NSString *)cellReuseIdentifier
-{
-    if (_cellReuseIdentifier == nil && self.classProperty != nil) {
-        RLMProperty *property = self.classProperty.property;
-        _cellReuseIdentifier = [NSString stringWithFormat:@"Property.%@.Optional.%d",
-                                [RLMDescriptions typeNameOfProperty:property], property.optional];
-    }
-    return _cellReuseIdentifier;
 }
 
 + (NSDictionary *)measurementAttributes
@@ -53,7 +40,7 @@ const CGFloat kMaxColumnWidth = 200.0;
     static NSDictionary *textAttributes = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        textAttributes = @{NSFontAttributeName: [NSFont monospacedDigitSystemFontOfSize:12.0 weight:NSFontWeightRegular]};
+        textAttributes = @{NSFontAttributeName: [RLMDrawnRowView cellTextFont]};
     });
     return textAttributes;
 }
