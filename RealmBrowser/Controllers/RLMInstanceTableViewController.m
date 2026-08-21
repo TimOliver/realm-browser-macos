@@ -148,15 +148,15 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     [self.tableView setAutosaveTableColumns:NO];
     
     RLMRealm *realm = self.parentWindowController.document.presentedRealm.realm;
+    NSInteger selectionIndex = NSNotFound;
     
     if ([newState isMemberOfClass:[RLMNavigationState class]]) {
         self.displayedType = newState.selectedType;
-        [self.realmTableView setupColumnsWithType:newState.selectedType];
 
         if (newState.selectedInstanceIndex != NSNotFound) {
-            [self setSelectionIndex:newState.selectedInstanceIndex];
+            selectionIndex = newState.selectedInstanceIndex;
         } else if (self.displayedType.instanceCount > 0) {
-            [self setSelectionIndex:0];
+            selectionIndex = 0;
         }
     }
     else if ([newState isMemberOfClass:[RLMArrayNavigationState class]]) {
@@ -168,8 +168,7 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                                                                          onObject:referingInstance
                                                                             realm:realm];
         self.displayedType = arrayNode;
-        [self.realmTableView setupColumnsWithType:arrayNode];
-        [self setSelectionIndex:arrayState.arrayIndex];
+        selectionIndex = arrayState.arrayIndex;
     }
     else if ([newState isMemberOfClass:[RLMQueryNavigationState class]]) {
         RLMQueryNavigationState *queryState = (RLMQueryNavigationState *)newState;
@@ -178,14 +177,18 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
                                                                      result:queryState.results
                                                                   andParent:queryState.selectedType];
         self.displayedType = resultsNode;
-        [self.realmTableView setupColumnsWithType:resultsNode];
-        [self setSelectionIndex:0];
+        selectionIndex = 0;
     }
-    
-    self.tableView.autosaveName = [NSString stringWithFormat:@"%lu:%@", realm.hash, self.displayedType.name];
-    [self.tableView setAutosaveTableColumns:YES];
 
-    [self.realmTableView sizeColumnsToFitOnscreenContents];
+    NSString *autosaveName = [NSString stringWithFormat:@"%lu:%@", realm.hash, self.displayedType.name];
+    [self.realmTableView setupColumnsWithType:self.displayedType autosaveName:autosaveName];
+
+    // Scrolling a selection into view can force NSTableView to lay out immediately.
+    // Do it only after the pooled columns have their final fitted widths, otherwise
+    // Sequoia briefly presents the outgoing widths before the auto-fit realigns them.
+    if (selectionIndex != NSNotFound) {
+        [self setSelectionIndex:selectionIndex];
+    }
 
     [self observeDisplayedCollection];
 

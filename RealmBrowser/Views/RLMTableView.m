@@ -110,6 +110,7 @@ static NSDictionary<NSAnimatablePropertyKey, id> *RLMDisabledViewAnimations(void
     NSString *currentTypeName;
     BOOL applyingFittedWidths;
     BOOL widthsChanged;
+    BOOL columnGeometryNeedsSettling;
     NSMutableDictionary<NSString *, NSNumber *> *fittedColumnWidths;
 
     NSMenuItem *clickLockItem;
@@ -600,8 +601,14 @@ enum MenuTags {
         return;
     }
     currentColumnSignature = signature;
+    columnGeometryNeedsSettling = YES;
 
     RLMPerformWithoutAnimations(^{
+        // Width and visibility notifications are synchronous. Coalesce their
+        // tooltip/redraw work with the auto-fit pass, after every column has its
+        // final geometry.
+        applyingFittedWidths = YES;
+
         // Column mutations synchronously write table-state autosave entries — still
         // keyed to the *outgoing* class's autosave name at this point — so suspend
         // autosaving while rebuilding. The window controller re-enables it with the
@@ -665,10 +672,21 @@ enum MenuTags {
         // Not reloadData: that purges the row reuse pool, and the rows would all be
         // rebuilt. The row count is updated and every visible row redraws its content.
         [self noteNumberOfRowsChanged];
-        [self settleColumnGeometry];
         [self redrawAllRows];
+        applyingFittedWidths = NO;
+    });
+}
 
-        [self updateHeaderToolTipRects];
+- (void)setupColumnsWithType:(RLMTypeNode *)typeNode autosaveName:(NSString *)autosaveName
+{
+    // AppKit may commit nested table/header layout work before the navigation
+    // handler returns. Keep schema mutation, autosave restoration and auto-fit
+    // inside one outer transaction so only the final fitted geometry is presented.
+    RLMPerformWithoutAnimations(^{
+        [self setupColumnsWithType:typeNode];
+        self.autosaveName = autosaveName;
+        self.autosaveTableColumns = YES;
+        [self sizeColumnsToFitOnscreenContents];
     });
 }
 
@@ -768,13 +786,21 @@ static const NSInteger kMaxRowsToMeasureForFit = 20;
 
         applyingFittedWidths = NO;
         self.autosaveTableColumns = wasAutosavingColumns;
-        if (widthsChanged) {
+        BOOL shouldSettleGeometry = columnGeometryNeedsSettling || widthsChanged;
+        if (shouldSettleGeometry) {
+            // Column setup deliberately leaves the pooled columns uncommitted. Settle
+            // once here, after uncached columns have received their fitted widths, so
+            // AppKit never presents the outgoing class's widths under the new headers.
             [self settleColumnGeometry];
+            columnGeometryNeedsSettling = NO;
 
-            // Done once rather than per column: -columnDidResize: rebuilds every header
-            // tooltip rect and repaints every row, and a wide class would otherwise pay
-            // for that once per column.
             [self updateHeaderToolTipRects];
+        }
+
+        if (widthsChanged) {
+            // Done once rather than per column: -columnDidResize: rebuilds every header
+            // tooltip rect and repaints every row, and a wide class would otherwise
+            // repaint once per column.
             [self redrawAllRows];
         }
     });

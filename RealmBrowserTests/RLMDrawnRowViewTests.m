@@ -40,6 +40,24 @@
 - (void)discardInlineEditing;
 @end
 
+// Private hook used to verify that a schema switch and its auto-fit produce one
+// committed geometry state rather than presenting the pre-fit widths first.
+@interface RLMTableView (RLMDrawnRowViewTests)
+- (void)settleColumnGeometry;
+@end
+
+@interface RLMSettlementCountingTableView : RLMTableView
+@property (nonatomic) NSUInteger settlementCount;
+@end
+
+@implementation RLMSettlementCountingTableView
+- (void)settleColumnGeometry
+{
+    self.settlementCount++;
+    [super settleColumnGeometry];
+}
+@end
+
 // A data source/delegate that serves the same RLMCellContent per column to every row.
 @interface RLMDrawnRowViewTestHost : NSObject <NSTableViewDataSource, NSTableViewDelegate, RLMDrawnRowViewDataSource>
 @property (nonatomic, copy) NSArray<RLMCellContent *> *contentsByColumn;
@@ -558,6 +576,58 @@ static NSRect RLMInkBoundsInColumnSpan(NSView *view, NSRect rect)
 
     XCTAssertEqual([self stringColumnOfTableView:tableView].width, fittedWidth,
                    @"column setup restores the fitted width instead of the default");
+}
+
+- (void)testColumnSetupSettlesOnceAfterAutoFit
+{
+    RLMClassNode *classNode = [self classNodeForStringValues:@[@"ab", @"cd", @"ef"]];
+    XCTAssertNotNil(classNode);
+
+    RLMInstanceTableViewController *controller = [[RLMInstanceTableViewController alloc] init];
+    controller.displayedType = classNode;
+
+    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 900, 400)
+                                              styleMask:NSWindowStyleMaskBorderless
+                                                backing:NSBackingStoreBuffered
+                                                  defer:NO];
+    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:self.window.contentView.bounds];
+    RLMSettlementCountingTableView *tableView = [[RLMSettlementCountingTableView alloc] initWithFrame:scrollView.bounds];
+    tableView.dataSource = controller;
+    tableView.delegate = controller;
+    scrollView.documentView = tableView;
+    [self.window.contentView addSubview:scrollView];
+
+    [tableView setupColumnsWithType:classNode];
+    XCTAssertEqual(tableView.settlementCount, 0u,
+                   @"schema setup must not present the outgoing widths under the new headers");
+
+    [tableView sizeColumnsToFitOnscreenContents];
+    XCTAssertEqual(tableView.settlementCount, 1u,
+                   @"the schema and its fitted widths settle as one geometry state");
+
+    [tableView setupColumnsWithType:classNode];
+    [tableView sizeColumnsToFitOnscreenContents];
+    XCTAssertEqual(tableView.settlementCount, 1u,
+                   @"same-schema navigation keeps the settled fast path");
+}
+
+- (void)testAtomicColumnTransitionSettlesFittedGeometryOnce
+{
+    RLMClassNode *classNode = [self classNodeForStringValues:@[@"ab", @"cd", @"ef"]];
+    XCTAssertNotNil(classNode);
+
+    RLMInstanceTableViewController *controller = [[RLMInstanceTableViewController alloc] init];
+    controller.displayedType = classNode;
+
+    RLMSettlementCountingTableView *tableView = [[RLMSettlementCountingTableView alloc] initWithFrame:NSMakeRect(0, 0, 900, 400)];
+    tableView.dataSource = controller;
+    tableView.delegate = controller;
+
+    [tableView setupColumnsWithType:classNode autosaveName:@"test.atomic-column-transition"];
+
+    XCTAssertEqual(tableView.settlementCount, 1u);
+    XCTAssertTrue(tableView.autosaveTableColumns);
+    XCTAssertEqualObjects(tableView.autosaveName, @"test.atomic-column-transition");
 }
 
 - (void)testAutoFitMarksRowsForRedrawWhenColumnWidthsChange
