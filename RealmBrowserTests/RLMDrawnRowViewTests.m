@@ -85,6 +85,28 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
     return NO;
 }
 
+// Bounding box of the non-background pixels of `view` within the horizontal span of `rect`,
+// in view coordinates. NSZeroRect when nothing was drawn there.
+static NSRect RLMInkBoundsInColumnSpan(NSView *view, NSRect rect)
+{
+    NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
+    [view cacheDisplayInRect:view.bounds toBitmapImageRep:rep];
+    CGFloat scale = rep.pixelsWide / NSWidth(view.bounds);
+    NSInteger minX = MAX((NSInteger)floor(NSMinX(rect) * scale), 0);
+    NSInteger maxX = MIN((NSInteger)ceil(NSMaxX(rect) * scale), rep.pixelsWide);
+    NSColor *background = [rep colorAtX:minX y:0];
+    NSInteger left = NSIntegerMax, right = NSIntegerMin, top = NSIntegerMax, bottom = NSIntegerMin;
+    for (NSInteger y = 0; y < rep.pixelsHigh; y++) {
+        for (NSInteger x = minX; x < maxX; x++) {
+            if ([[rep colorAtX:x y:y] isEqual:background]) { continue; }
+            left = MIN(left, x); right = MAX(right, x);
+            top = MIN(top, y); bottom = MAX(bottom, y);
+        }
+    }
+    if (left > right) { return NSZeroRect; }
+    return NSMakeRect(left / scale, top / scale, (right - left + 1) / scale, (bottom - top + 1) / scale);
+}
+
 @interface RLMDrawnRowViewTests : XCTestCase
 @property (nonatomic, strong) NSWindow *window;          // keeps the offscreen view hierarchy alive
 @property (nonatomic, strong) RLMDrawnRowViewTestHost *host;
@@ -563,6 +585,55 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
     }];
     XCTAssertGreaterThan(rowsSeen, 0);
     XCTAssertEqual(rowsMarked, rowsSeen, @"moving columns must repaint every row, whatever coalesces the resizes");
+}
+
+#pragma mark - Text rendering (pinned across the CoreText change)
+
+- (void)testCellTextIsVerticallyCentredAndStartsAtTheCellEdge
+{
+    NSTableView *tableView = [self makeTableViewWithColumnCount:2 columnWidth:200.0];
+    self.host.contentsByColumn = @[[RLMCellContent textContent:@"Hxy" showsNilPlaceholder:NO],
+                                   [RLMCellContent textContent:@"" showsNilPlaceholder:NO]];
+    NSTableRowView *rowView = [tableView rowViewAtRow:0 makeIfNecessary:YES];
+    NSRect cell = [self cellRectOfRowView:rowView tableView:tableView column:0 row:0];
+
+    NSRect ink = RLMInkBoundsInColumnSpan(rowView, cell);
+    XCTAssertFalse(NSIsEmptyRect(ink), @"text must draw");
+    XCTAssertTrue(NSContainsRect(NSInsetRect(cell, -1.0, -1.0), ink), @"text stays inside its cell");
+    XCTAssertEqualWithAccuracy(NSMinX(ink), NSMinX(cell), 2.0, @"text starts at the cell's leading edge");
+    XCTAssertEqualWithAccuracy(NSMidY(ink), NSMidY(cell), 2.0, @"text is vertically centred in the row");
+}
+
+- (void)testLongCellTextIsTruncatedToTheColumn
+{
+    NSTableView *tableView = [self makeTableViewWithColumnCount:2 columnWidth:80.0];
+    NSString *tooLong = [@"" stringByPaddingToLength:200 withString:@"W" startingAtIndex:0];
+    self.host.contentsByColumn = @[[RLMCellContent textContent:tooLong showsNilPlaceholder:NO],
+                                   [RLMCellContent textContent:@"" showsNilPlaceholder:NO]];
+    NSTableRowView *rowView = [tableView rowViewAtRow:0 makeIfNecessary:YES];
+    NSRect cell = [self cellRectOfRowView:rowView tableView:tableView column:0 row:0];
+
+    NSRect ink = RLMInkBoundsInColumnSpan(rowView, cell);
+    XCTAssertFalse(NSIsEmptyRect(ink));
+    XCTAssertLessThanOrEqual(NSMaxX(ink), NSMaxX(cell) + 1.0, @"text must not spill past its column");
+
+    // The neighbouring column stays empty, which it would not if the text overflowed.
+    XCTAssertFalse(RLMViewHasInkInColumnSpan(rowView, [self cellRectOfRowView:rowView tableView:tableView column:1 row:0]));
+}
+
+- (void)testLinkTextIsUnderlined
+{
+    NSTableView *tableView = [self makeTableViewWithColumnCount:2 columnWidth:200.0];
+    // No descenders, so any ink below the glyphs is the underline.
+    self.host.contentsByColumn = @[[RLMCellContent textContent:@"HEX" showsNilPlaceholder:NO],
+                                   [RLMCellContent linkContent:@"HEX"]];
+    NSTableRowView *rowView = [tableView rowViewAtRow:0 makeIfNecessary:YES];
+
+    NSRect plainInk = RLMInkBoundsInColumnSpan(rowView, [self cellRectOfRowView:rowView tableView:tableView column:0 row:0]);
+    NSRect linkInk = RLMInkBoundsInColumnSpan(rowView, [self cellRectOfRowView:rowView tableView:tableView column:1 row:0]);
+    XCTAssertFalse(NSIsEmptyRect(plainInk));
+    XCTAssertFalse(NSIsEmptyRect(linkInk));
+    XCTAssertGreaterThan(NSMaxY(linkInk), NSMaxY(plainInk), @"the underline puts ink below the same text unadorned");
 }
 
 @end

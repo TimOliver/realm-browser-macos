@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+@import CoreText;
+
 #import "RLMDrawnRowView.h"
 #import "RLMCellContent.h"
 
@@ -50,18 +52,6 @@ static const CGFloat kBadgeGap = 4.0;
     return font;
 }
 
-+ (NSParagraphStyle *)cellTextParagraphStyle
-{
-    static NSParagraphStyle *style;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSMutableParagraphStyle *mutableStyle = [[NSMutableParagraphStyle alloc] init];
-        mutableStyle.lineBreakMode = NSLineBreakByTruncatingTail;
-        style = [mutableStyle copy];
-    });
-    return style;
-}
-
 + (CGFloat)cellTextHeight
 {
     static CGFloat height;
@@ -72,30 +62,59 @@ static const CGFloat kBadgeGap = 4.0;
     return height;
 }
 
-// Text attributes for the three text styles, normal and emphasized (selected row).
-+ (NSDictionary *)attributesForKind:(RLMCellContentKind)kind placeholder:(BOOL)placeholder emphasized:(BOOL)emphasized
++ (NSColor *)textColorForKind:(RLMCellContentKind)kind placeholder:(BOOL)placeholder emphasized:(BOOL)emphasized
 {
-    NSColor *color;
     if (emphasized) {
-        color = NSColor.alternateSelectedControlTextColor;
+        return NSColor.alternateSelectedControlTextColor;
     }
-    else if (placeholder) {
-        color = NSColor.placeholderTextColor;
+    if (placeholder) {
+        return NSColor.placeholderTextColor;
     }
-    else if (kind == RLMCellContentKindLink) {
-        color = NSColor.linkColor;
+    if (kind == RLMCellContentKindLink) {
+        return NSColor.linkColor;
     }
-    else {
-        color = NSColor.labelColor;
+    return NSColor.labelColor;
+}
+
+// Laid-out lines, keyed by the text and whether it is underlined. Building a line is
+// the expensive half of drawing a cell, and a table redraws the same values over and
+// over — on scroll, on selection changes, on every navigation back to a class.
+// The lines carry no colour (see kCTForegroundColorFromContextAttributeName below), so
+// one cached line serves normal, link, placeholder and selected cells alike.
++ (NSCache<NSString *, id> *)lineCache
+{
+    static NSCache *cache;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [[NSCache alloc] init];
+        cache.countLimit = 4096;
+    });
+    return cache;
+}
+
++ (CTLineRef)lineForText:(NSString *)text underlined:(BOOL)underlined
+{
+    NSCache *cache = [self lineCache];
+    NSString *key = [(underlined ? @"1" : @"0") stringByAppendingString:text];
+    id cached = [cache objectForKey:key];
+    if (cached != nil) {
+        return (__bridge CTLineRef)cached;
     }
 
     NSMutableDictionary *attributes = [@{NSFontAttributeName: [self cellTextFont],
-                                         NSParagraphStyleAttributeName: [self cellTextParagraphStyle],
-                                         NSForegroundColorAttributeName: color} mutableCopy];
-    if (kind == RLMCellContentKindLink && !placeholder) {
+                                         // Take the colour from the context at draw time, so the
+                                         // line can be shared between every colour a cell uses.
+                                         (id)kCTForegroundColorFromContextAttributeName: @YES} mutableCopy];
+    if (underlined) {
         attributes[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
     }
-    return attributes;
+    NSAttributedString *attributed = [[NSAttributedString alloc] initWithString:text attributes:attributes];
+    CTLineRef line = CTLineCreateWithAttributedString((CFAttributedStringRef)attributed);
+    if (line == NULL) {
+        return NULL;
+    }
+    [cache setObject:(__bridge_transfer id)line forKey:key];
+    return (__bridge CTLineRef)[cache objectForKey:key];
 }
 
 #pragma mark - Redraw on selection changes
@@ -181,9 +200,67 @@ static const CGFloat kBadgeGap = 4.0;
 
 - (void)drawText:(NSString *)text kind:(RLMCellContentKind)kind placeholder:(BOOL)placeholder inRect:(NSRect)rect emphasized:(BOOL)emphasized
 {
-    CGFloat height = [RLMDrawnRowView cellTextHeight];
-    NSRect textRect = NSMakeRect(NSMinX(rect), round(NSMidY(rect) - height / 2.0), NSWidth(rect), height);
-    [text drawInRect:textRect withAttributes:[RLMDrawnRowView attributesForKind:kind placeholder:placeholder emphasized:emphasized]];
+    if (NSWidth(rect) <= 0.0) {
+        return;
+    }
+    BOOL underlined = (kind == RLMCellContentKindLink && !placeholder);
+    CTLineRef line = [RLMDrawnRowView lineForText:text underlined:underlined];
+    if (line == NULL) {
+        return;
+    }
+
+    // Only pay for a truncated line when the text actually overflows its column.
+    CTLineRef lineToDraw = line;
+    CTLineRef truncated = NULL;
+    if (CTLineGetTypographicBounds(line, NULL, NULL, NULL) > NSWidth(rect)) {
+        truncated = [RLMDrawnRowView truncatedLineFor:line width:NSWidth(rect) underlined:underlined];
+        if (truncated == NULL) {
+            return;
+        }
+        lineToDraw = truncated;
+    }
+
+    CGFloat ascent = 0.0, descent = 0.0;
+    CTLineGetTypographicBounds(lineToDraw, &ascent, &descent, NULL);
+    CGFloat baseline = round(NSMidY(rect) + (ascent - descent) / 2.0);
+
+    CGContextRef context = NSGraphicsContext.currentContext.CGContext;
+    CGContextSaveGState(context);
+    // The row view is flipped, so the glyphs are flipped back the other way and the
+    // baseline is measured from the top of the view like every other rect here.
+    CGContextSetTextMatrix(context, CGAffineTransformMakeScale(1.0, -1.0));
+    CGContextSetFillColorWithColor(context, [RLMDrawnRowView textColorForKind:kind placeholder:placeholder emphasized:emphasized].CGColor);
+    CGContextSetTextPosition(context, NSMinX(rect), baseline);
+    CTLineDraw(lineToDraw, context);
+    CGContextRestoreGState(context);
+
+    if (truncated != NULL) {
+        CFRelease(truncated);
+    }
+}
+
+// Caller owns the returned line. NULL when not even the ellipsis fits.
++ (CTLineRef)truncatedLineFor:(CTLineRef)line width:(CGFloat)width underlined:(BOOL)underlined
+{
+    static NSMutableDictionary<NSString *, id> *tokens;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        tokens = [NSMutableDictionary dictionary];
+    });
+
+    NSString *key = underlined ? @"1" : @"0";
+    CTLineRef token = (__bridge CTLineRef)tokens[key];
+    if (token == NULL) {
+        NSMutableDictionary *attributes = [@{NSFontAttributeName: [self cellTextFont],
+                                             (id)kCTForegroundColorFromContextAttributeName: @YES} mutableCopy];
+        if (underlined) {
+            attributes[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
+        }
+        NSAttributedString *ellipsis = [[NSAttributedString alloc] initWithString:@"\u2026" attributes:attributes];
+        tokens[key] = (__bridge_transfer id)CTLineCreateWithAttributedString((CFAttributedStringRef)ellipsis);
+        token = (__bridge CTLineRef)tokens[key];
+    }
+    return CTLineCreateTruncatedLine(line, width, kCTLineTruncationEnd, token);
 }
 
 - (void)drawCheckboxChecked:(BOOL)checked inRect:(NSRect)cellRect emphasized:(BOOL)emphasized
