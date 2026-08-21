@@ -23,6 +23,7 @@
 #import "RLMTestObjects.h"
 #import "RLMTestDataGenerator.h"
 #import "RLMRealmNode.h"
+#import "RLMTypeOutlineViewController.h"
 
 @interface RealmBrowserTests : XCTestCase
 
@@ -57,6 +58,16 @@
     XCTAssertNil(error);
     XCTAssertNotNil(realm);
     XCTAssertEqual(10, [[realm allObjects:[RealmObject1 className]] count]);
+}
+
+- (void)testOutlineReloadHandlesNoSelection
+{
+    RLMTypeOutlineViewController *controller = [[RLMTypeOutlineViewController alloc] init];
+    XCTAssertNotNil(controller.view);
+    XCTAssertEqual(controller.tableView.selectedRow, -1);
+
+    XCTAssertNoThrow([controller reloadData]);
+    XCTAssertEqual(controller.tableView.selectedRow, -1);
 }
 
 // FIXME: Re-enable these tests

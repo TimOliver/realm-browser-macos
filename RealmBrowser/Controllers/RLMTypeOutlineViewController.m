@@ -65,13 +65,19 @@
     }
 }
 
-- (void)reloadData {
+- (void)reloadData
+{
     NSInteger row = self.tableView.selectedRow;
-    [self.tableView reloadData];
 
     self.skipSelectionChangeHandling = YES;
-    // selectRowIndexes:byExtendingSelection: notifies delegate but this notification should be skipped.
-    [self.tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+    [self.tableView reloadData];
+
+    // Array navigation deliberately clears the sidebar selection. Avoid constructing
+    // an index set from -1, and do not restore a row that disappeared during reload.
+    NSIndexSet *selection = (row >= 0 && row < self.tableView.numberOfRows)
+        ? [NSIndexSet indexSetWithIndex:(NSUInteger)row]
+        : [NSIndexSet indexSet];
+    [self.tableView selectRowIndexes:selection byExtendingSelection:NO];
     self.skipSelectionChangeHandling = NO;
 }
 
