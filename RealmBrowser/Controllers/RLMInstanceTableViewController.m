@@ -28,18 +28,12 @@
 #import "RLMResultsNode.h"
 #import "RLMRealmNode.h"
 
-#import "RLMBadgeTableCellView.h"
-#import "RLMBasicTableCellView.h"
-#import "RLMBoolTableCellView.h"
-#import "RLMOptionalBoolTableCellView.h"
-#import "RLMNumberTableCellView.h"
-#import "RLMImageTableCellView.h"
+#import "RLMDrawnRowView.h"
+#import "RLMCellContent.h"
 
 #import "RLMTableColumn.h"
 
 #import "NSColor+ByteSizeFactory.h"
-
-#import "objc/objc-class.h"
 
 #import "RLMDescriptions.h"
 
@@ -284,15 +278,16 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
 
 - (NSTableRowView *)tableView:(NSTableView *)tableView rowViewForRow:(NSInteger)row
 {
-    // Row views only participate in the reuse queue when supplied with an
-    // identifier; without this the table allocates a fresh NSTableRowView per
-    // row on every reload, which is one of the largest scroll/reload costs.
-    static NSString * const kRowViewIdentifier = @"RLMTableRowView";
-    NSTableRowView *rowView = [tableView makeViewWithIdentifier:kRowViewIdentifier owner:self];
+    // The table hosts no cell views: each row view draws all of its columns itself
+    // (see RLMDrawnRowView). Row views are recycled through the table's reuse queue.
+    RLMDrawnRowView *rowView = [tableView makeViewWithIdentifier:RLMDrawnRowViewReuseIdentifier owner:self];
     if (rowView == nil) {
-        rowView = [[NSTableRowView alloc] initWithFrame:NSZeroRect];
-        rowView.identifier = kRowViewIdentifier;
+        rowView = [[RLMDrawnRowView alloc] initWithFrame:NSZeroRect];
+        rowView.identifier = RLMDrawnRowViewReuseIdentifier;
     }
+    rowView.tableView = tableView;
+    rowView.contentDataSource = self;
+    [rowView setNeedsDisplay:YES];
     return rowView;
 }
 
@@ -432,126 +427,56 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
     }
 }
 
--(NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
+- (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
 {
-    if (tableView != self.tableView) {
+    // No cell views - RLMDrawnRowView draws every column (see rowView:contentForTableColumn:row:).
+    return nil;
+}
+
+#pragma mark - RLMDrawnRowViewDataSource
+
+- (RLMCellContent *)rowView:(RLMDrawnRowView *)rowView contentForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
+{
+    if (![tableColumn isKindOfClass:[RLMTableColumn class]]) {
         return nil;
     }
-    
-    RLMClassProperty *classProperty = nil;
-    NSString *reuseIdentifier = nil;
-    if ([tableColumn isKindOfClass:[RLMTableColumn class]]) {
-        classProperty = [(RLMTableColumn *)tableColumn classProperty];
-        reuseIdentifier = [(RLMTableColumn *)tableColumn cellReuseIdentifier];
-    }
+    RLMClassProperty *classProperty = [(RLMTableColumn *)tableColumn classProperty];
 
     // Array gutter (the only column with no backing property)
     if (classProperty == nil) {
-        RLMBasicTableCellView *gutterCellView = [tableView makeViewWithIdentifier:@"GutterCell" owner:self];
-
-        if (gutterCellView == nil) {
-            gutterCellView = [RLMBasicTableCellView viewWithIdentifier:@"GutterCell"];
-        }
-
-        gutterCellView.text = [@(rowIndex) stringValue];
-
-        return gutterCellView;
+        return [RLMCellContent textContent:[@(rowIndex) stringValue] showsNilPlaceholder:NO];
     }
-    
+    if (rowIndex < 0 || (NSUInteger)rowIndex >= self.displayedType.instanceCount) {
+        return nil;
+    }
+
     RLMProperty *property = classProperty.property;
-    RLMObject *selectedInstance = [self.displayedType instanceAtIndex:rowIndex];
-    id propertyValue = selectedInstance[classProperty.name];
+    RLMObject *instance = [self.displayedType instanceAtIndex:(NSUInteger)rowIndex];
+    id propertyValue = instance[classProperty.name];
     if (propertyValue == NSNull.null) {
         propertyValue = nil;
     }
 
     if (property.array) {
-        RLMBadgeTableCellView *badgeCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
-        if (!badgeCellView) {
-            badgeCellView = [RLMBadgeTableCellView viewWithIdentifier:reuseIdentifier];
-            badgeCellView.optional = YES;
-        }
-        badgeCellView.text = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-
-        badgeCellView.badge.hidden = NO;
-        badgeCellView.badge.title = [NSString stringWithFormat:@"%lu", [(RLMArray *)propertyValue count]];
-        badgeCellView.needsLayout = YES;
-        [badgeCellView.badge.cell setHighlightsBy:0];
-
-        // Tooltips describe the array contents recursively, which is too expensive
-        // to do per-cell while scrolling; they are set on hover instead
-        // (see mouseDidEnterCellAtLocation:). Clear any value left by cell reuse.
-        badgeCellView.toolTip = nil;
-        return badgeCellView;
+        return [RLMCellContent badgeContent:[realmDescriptions printablePropertyValue:propertyValue ofType:property]
+                                      count:[(RLMArray *)propertyValue count]];
     }
 
-    NSTableCellView *cellView;
     switch (classProperty.type) {
-        case RLMPropertyTypeBool: {
+        case RLMPropertyTypeBool:
             if (property.optional) {
-                RLMOptionalBoolTableCellView *boolCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
-                if (!boolCellView) {
-                    boolCellView = [RLMOptionalBoolTableCellView viewWithIdentifier:reuseIdentifier];
-                }
-
-                // 0 = nil, 1 = False, 2 = True
-                if (propertyValue == nil) {
-                    [boolCellView.popupControl selectItemAtIndex:0];
-                }
-                else {
-                    if ([propertyValue boolValue]) {
-                        [boolCellView.popupControl selectItemAtIndex:2];
-                    }
-                    else {
-                        [boolCellView.popupControl selectItemAtIndex:1];
-                    }
-                }
-                boolCellView.popupControl.enabled = NO;
-
-                cellView = boolCellView;
+                // Mirrors the old nil / false / true popup, as text.
+                NSString *text = (propertyValue == nil) ? @"" : ([propertyValue boolValue] ? @"true" : @"false");
+                return [RLMCellContent textContent:text showsNilPlaceholder:YES];
             }
-            else {
-                RLMBoolTableCellView *boolCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
-                if (!boolCellView) {
-                    boolCellView = [RLMBoolTableCellView viewWithIdentifier:reuseIdentifier];
-                }
-                boolCellView.checkBox.state = [(NSNumber *)propertyValue boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
-                boolCellView.checkBox.enabled = NO;
+            return [RLMCellContent boolContent:[(NSNumber *)propertyValue boolValue]];
 
-                cellView = boolCellView;
-            }
+        case RLMPropertyTypeObject:
+            return [RLMCellContent linkContent:[realmDescriptions printablePropertyValue:propertyValue ofType:property]];
 
-            break;
-        }
-            // Intentional fallthrough
         case RLMPropertyTypeInt:
         case RLMPropertyTypeFloat:
-        case RLMPropertyTypeDouble: {
-            RLMNumberTableCellView *numberCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
-            if (!numberCellView) {
-                numberCellView = [RLMNumberTableCellView viewWithIdentifier:reuseIdentifier];
-            }
-
-            numberCellView.text = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-
-            cellView = numberCellView;
-
-            break;
-        }
-
-        case RLMPropertyTypeObject: {
-            RLMLinkTableCellView *linkCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
-            if (!linkCellView) {
-                linkCellView = [RLMLinkTableCellView viewWithIdentifier:reuseIdentifier];
-            }
-
-            linkCellView.text = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-
-            cellView = linkCellView;
-
-            break;
-        }
-        // Intentional fallthrough
+        case RLMPropertyTypeDouble:
         case RLMPropertyTypeLinkingObjects:
         case RLMPropertyTypeData:
         case RLMPropertyTypeAny:
@@ -559,27 +484,10 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
         case RLMPropertyTypeString:
         case RLMPropertyTypeObjectId:
         case RLMPropertyTypeDecimal128:
-        case RLMPropertyTypeUUID: {
-            RLMBasicTableCellView *basicCellView = [tableView makeViewWithIdentifier:reuseIdentifier owner:self];
-            if (!basicCellView) {
-                basicCellView = [RLMBasicTableCellView viewWithIdentifier:reuseIdentifier];
-            }
-
-            basicCellView.text = [realmDescriptions printablePropertyValue:propertyValue ofType:property];
-
-            cellView = basicCellView;
-
-            break;
-        }
+        case RLMPropertyTypeUUID:
+            return [RLMCellContent textContent:[realmDescriptions printablePropertyValue:propertyValue ofType:property]
+                            showsNilPlaceholder:property.optional];
     }
-
-    if ([cellView respondsToSelector:@selector(setOptional:)]) {
-        [(id)cellView setOptional:property.optional];
-    }
-
-    // Set on hover instead (see mouseDidEnterCellAtLocation:); clear reuse leftovers.
-    cellView.toolTip = nil;
-    return cellView;
 }
 
 #pragma mark - RLMTableView Delegate

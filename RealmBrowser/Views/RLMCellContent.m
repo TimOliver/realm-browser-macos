@@ -39,7 +39,9 @@
 
 + (instancetype)linkContent:(NSString *)text
 {
-    return [[self alloc] initWithKind:RLMCellContentKindLink text:text placeholder:NO boolValue:NO badgeText:nil];
+    // Object links are always optional in Realm, so an empty link draws the "nil"
+    // placeholder, as the link cell views used to.
+    return [[self alloc] initWithKind:RLMCellContentKindLink text:text placeholder:YES boolValue:NO badgeText:nil];
 }
 
 + (instancetype)boolContent:(BOOL)value

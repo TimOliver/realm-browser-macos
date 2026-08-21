@@ -36,7 +36,7 @@ typedef NS_ENUM(NSInteger, RLMCellContentKind) {
 @property (nonatomic, readonly, copy) NSString *badgeText;  // kind == RLMCellContentKindBadge
 
 + (instancetype)textContent:(NSString *)text showsNilPlaceholder:(BOOL)placeholder;
-+ (instancetype)linkContent:(NSString *)text;
++ (instancetype)linkContent:(NSString *)text;   // always shows the nil placeholder when empty
 + (instancetype)boolContent:(BOOL)value;
 + (instancetype)badgeContent:(NSString *)text count:(NSUInteger)count;
 

@@ -22,6 +22,13 @@
 
 #import "RLMCellContent.h"
 #import "RLMDrawnRowView.h"
+#import "RLMInstanceTableViewController.h"
+#import "RLMRealmNode.h"
+#import "RLMClassNode.h"
+#import "RLMTableColumn.h"
+#import "RLMClassProperty.h"
+#import "RLMTestDataGenerator.h"
+#import "TestClasses.h"
 
 // A data source/delegate that serves the same RLMCellContent per column to every row.
 @interface RLMDrawnRowViewTestHost : NSObject <NSTableViewDataSource, NSTableViewDelegate, RLMDrawnRowViewDataSource>
@@ -99,6 +106,8 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
     RLMCellContent *link = [RLMCellContent linkContent:@"Person(...)"];
     XCTAssertEqual(link.kind, RLMCellContentKindLink);
     XCTAssertEqualObjects(link.text, @"Person(...)");
+    XCTAssertTrue(link.showsNilPlaceholder, @"object links are optional: an empty link draws the nil placeholder");
+    XCTAssertEqualObjects([RLMCellContent linkContent:@""].accessibilityValueString, @"nil");
 
     RLMCellContent *yes = [RLMCellContent boolContent:YES];
     XCTAssertEqual(yes.kind, RLMCellContentKindBool);
@@ -196,6 +205,74 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
     XCTAssertEqualObjects([RLMDrawnRowView cellTextFont], [NSFont monospacedDigitSystemFontOfSize:12.0 weight:NSFontWeightRegular]);
     XCTAssertGreaterThan([RLMDrawnRowView cellTextHeight], 10.0);
     XCTAssertEqualObjects(RLMDrawnRowViewReuseIdentifier, @"RLMDrawnRowView");
+}
+
+#pragma mark - Controller content mapping
+
+- (RLMTableColumn *)columnForProperty:(RLMClassProperty *)classProperty
+{
+    RLMTableColumn *column = [[RLMTableColumn alloc] initWithIdentifier:classProperty.name];
+    column.propertyType = classProperty.type;
+    column.classProperty = classProperty;
+    return column;
+}
+
+- (void)testControllerMapsPropertyTypesToCellContent
+{
+    NSString *fileName = [NSString stringWithFormat:@"%@.realm", [[NSUUID UUID] UUIDString]];
+    NSURL *fileURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+    @autoreleasepool {
+        // The generator opens the file non-dynamically; the cached RLMRealm has to go
+        // away before RLMRealmNode can reopen it in dynamic mode.
+        XCTAssertTrue([RLMTestDataGenerator createRealmAtUrl:fileURL withClassesNamed:@[[RealmTestClass1 className]] objectCount:3 encryptionKey:nil]);
+    }
+
+    RLMRealmNode *realmNode = [[RLMRealmNode alloc] initWithFileURL:fileURL];
+    NSError *error = nil;
+    XCTAssertTrue([realmNode connect:&error]);
+    XCTAssertNil(error);
+
+    RLMClassNode *classNode = nil;
+    for (RLMClassNode *node in realmNode.topLevelClasses) {
+        if ([node.name isEqualToString:[RealmTestClass1 className]]) { classNode = node; }
+    }
+    XCTAssertNotNil(classNode);
+
+    RLMInstanceTableViewController *controller = [[RLMInstanceTableViewController alloc] init];
+    (void)controller.view; // loads the nib; awakeFromNib creates the formatters
+    controller.displayedType = classNode;
+
+    RLMObject *object = [classNode instanceAtIndex:0];
+    NSMutableDictionary<NSString *, RLMCellContent *> *contents = [NSMutableDictionary dictionary];
+    for (RLMClassProperty *classProperty in classNode.propertyColumns) {
+        contents[classProperty.name] = [controller rowView:nil contentForTableColumn:[self columnForProperty:classProperty] row:0];
+    }
+
+    XCTAssertEqual(contents[@"integerValue"].kind, RLMCellContentKindText);
+    XCTAssertEqualObjects(contents[@"integerValue"].text, [controller displayedStringForColumn:classNode.propertyColumns[0] row:0]);
+    XCTAssertGreaterThan(contents[@"integerValue"].text.length, 0u);
+    XCTAssertFalse(contents[@"integerValue"].showsNilPlaceholder, @"non-optional properties draw nothing for empty text");
+
+    XCTAssertEqual(contents[@"boolValue"].kind, RLMCellContentKindBool);
+    XCTAssertEqual(contents[@"boolValue"].boolValue, [object[@"boolValue"] boolValue]);
+
+    XCTAssertEqual(contents[@"floatValue"].kind, RLMCellContentKindText);
+    XCTAssertEqual(contents[@"doubleValue"].kind, RLMCellContentKindText);
+    XCTAssertEqual(contents[@"stringValue"].kind, RLMCellContentKindText);
+    XCTAssertEqual(contents[@"dateValue"].kind, RLMCellContentKindText);
+    XCTAssertGreaterThan(contents[@"dateValue"].text.length, 0u);
+
+    RLMArray *array = object[@"arrayReference"];
+    XCTAssertEqual(contents[@"arrayReference"].kind, RLMCellContentKindBadge);
+    XCTAssertEqualObjects(contents[@"arrayReference"].badgeText, [@(array.count) stringValue]);
+    XCTAssertEqualObjects(contents[@"arrayReference"].text, [RealmTestClass0 className]);
+
+    // The array gutter column has no backing property and shows the row index.
+    RLMTableColumn *gutter = [[RLMTableColumn alloc] initWithIdentifier:@"#"];
+    XCTAssertEqualObjects([controller rowView:nil contentForTableColumn:gutter row:7].text, @"7");
+
+    // A plain NSTableColumn (no RLMTableColumn) yields nothing.
+    XCTAssertNil([controller rowView:nil contentForTableColumn:[[NSTableColumn alloc] initWithIdentifier:@"x"] row:0]);
 }
 
 @end
