@@ -22,6 +22,7 @@
 
 #import "RLMCellContent.h"
 #import "RLMDrawnRowView.h"
+#import "RLMTableView.h"
 #import "RLMInstanceTableViewController.h"
 #import "RLMRealmNode.h"
 #import "RLMClassNode.h"
@@ -134,7 +135,7 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
     NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:self.window.contentView.bounds];
-    NSTableView *tableView = [[NSTableView alloc] initWithFrame:scrollView.bounds];
+    NSTableView *tableView = [[RLMTableView alloc] initWithFrame:scrollView.bounds];
     tableView.rowHeight = 18.0;
     tableView.headerView = nil;
     for (NSUInteger i = 0; i < columnCount; i++) {
@@ -273,6 +274,34 @@ static BOOL RLMViewHasInkInColumnSpan(NSView *view, NSRect rect)
 
     // A plain NSTableColumn (no RLMTableColumn) yields nothing.
     XCTAssertNil([controller rowView:nil contentForTableColumn:[[NSTableColumn alloc] initWithIdentifier:@"x"] row:0]);
+}
+
+#pragma mark - Redraw helpers
+
+- (void)testRedrawHelpersMarkOnlyTheRequestedRowViews
+{
+    RLMTableView *tableView = (RLMTableView *)[self makeTableViewWithColumnCount:1 columnWidth:100.0];
+    [tableView rowViewAtRow:0 makeIfNecessary:YES];
+    [tableView rowViewAtRow:1 makeIfNecessary:YES];
+    [tableView rowViewAtRow:2 makeIfNecessary:YES];
+    // AppKit only clears needsDisplay through an actual display pass (assigning NO is
+    // ignored), so draw the fresh row views once to get a clean baseline.
+    [tableView enumerateAvailableRowViewsUsingBlock:^(NSTableRowView *rowView, NSInteger row) {
+        [rowView displayIfNeeded];
+    }];
+
+    [tableView redrawRowsAtIndexes:[NSIndexSet indexSetWithIndex:1]];
+    XCTAssertFalse([tableView rowViewAtRow:0 makeIfNecessary:NO].needsDisplay);
+    XCTAssertTrue([tableView rowViewAtRow:1 makeIfNecessary:NO].needsDisplay);
+    XCTAssertFalse([tableView rowViewAtRow:2 makeIfNecessary:NO].needsDisplay);
+
+    [tableView redrawAllRows];
+    [tableView enumerateAvailableRowViewsUsingBlock:^(NSTableRowView *rowView, NSInteger row) {
+        XCTAssertTrue(rowView.needsDisplay, @"row %ld should be marked", (long)row);
+    }];
+
+    // Out-of-range indexes are ignored.
+    [tableView redrawRowsAtIndexes:[NSIndexSet indexSetWithIndex:99]];
 }
 
 @end

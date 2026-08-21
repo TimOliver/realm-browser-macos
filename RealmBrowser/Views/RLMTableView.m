@@ -76,7 +76,9 @@ const NSInteger NOT_A_COLUMN = -1;
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    [self removeTrackingArea:trackingArea];
+    if (trackingArea != nil) {
+        [self removeTrackingArea:trackingArea];
+    }
 }
 
 #pragma mark - Public methods - Accessors
@@ -443,13 +445,32 @@ enum MenuTags {
 {
     [super updateTrackingAreas];
     
-    [self removeTrackingArea:trackingArea];
+    if (trackingArea != nil) {
+        [self removeTrackingArea:trackingArea];
+    }
     int opts = NSTrackingActiveInKeyWindow | NSTrackingInVisibleRect | NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved;
     trackingArea = [[NSTrackingArea alloc] initWithRect:[self bounds] options:opts owner:self userInfo:nil];
     [self addTrackingArea:trackingArea];
 }
 
 #pragma mark - Public Methods
+
+- (void)redrawAllRows
+{
+    [self enumerateAvailableRowViewsUsingBlock:^(NSTableRowView *rowView, NSInteger row) {
+        [rowView setNeedsDisplay:YES];
+    }];
+}
+
+- (void)redrawRowsAtIndexes:(NSIndexSet *)rows
+{
+    NSInteger rowCount = self.numberOfRows;
+    [rows enumerateIndexesUsingBlock:^(NSUInteger row, BOOL *stop) {
+        if ((NSInteger)row < rowCount) {
+            [[self rowViewAtRow:(NSInteger)row makeIfNecessary:NO] setNeedsDisplay:YES];
+        }
+    }];
+}
 
 - (void)scrollToRow:(NSInteger)rowIndex
 {
@@ -487,7 +508,10 @@ enum MenuTags {
             tableColumn.classProperty = newPropertyColumns[index];
             tableColumn.cachedHeaderToolTip = nil; // The statistics reflect the new node's data
         }
-        [self reloadData];
+        // Not reloadData: that purges the row reuse pool, and the rows would all be
+        // rebuilt. The row count is updated and every visible row redraws its content.
+        [self noteNumberOfRowsChanged];
+        [self redrawAllRows];
         return;
     }
     currentColumnSignature = signature;
@@ -565,7 +589,10 @@ enum MenuTags {
 
     [self endUpdates];
 
-    [self reloadData];
+    // Not reloadData: that purges the row reuse pool, and the rows would all be
+    // rebuilt. The row count is updated and every visible row redraws its content.
+    [self noteNumberOfRowsChanged];
+    [self redrawAllRows];
 
     [self updateHeaderToolTipRects];
 
@@ -587,6 +614,7 @@ enum MenuTags {
 - (void)columnDidResize:(NSNotification *)notification
 {
     [self updateHeaderToolTipRects];
+    [self redrawAllRows];
 }
 
 - (NSString *)view:(NSView *)view stringForToolTip:(NSToolTipTag)tag point:(NSPoint)point userData:(void *)data

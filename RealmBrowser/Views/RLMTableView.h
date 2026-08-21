@@ -114,4 +114,9 @@ typedef struct {
 // title regardless of window size. One-shot; called after navigation.
 - (void)sizeColumnsToFitOnscreenContents;
 
+// Rows draw their own content (RLMDrawnRowView), so data changes are surfaced by
+// redrawing row views rather than reloading cell views.
+- (void)redrawAllRows;
+- (void)redrawRowsAtIndexes:(NSIndexSet *)rows;
+
 @end

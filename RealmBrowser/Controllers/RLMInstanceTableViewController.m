@@ -233,9 +233,15 @@ typedef NS_ENUM(int32_t, RLMUpdateType) {
             [tableView beginUpdates];
             [tableView removeRowsAtIndexes:deletions withAnimation:NSTableViewAnimationEffectNone];
             [tableView insertRowsAtIndexes:insertions withAnimation:NSTableViewAnimationEffectNone];
-            [tableView reloadDataForRowIndexes:modifications
-                                 columnIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, (NSUInteger)tableView.numberOfColumns)]];
             [tableView endUpdates];
+            // Row views draw their own content: redraw the modified rows. In array
+            // mode the gutter shows indexes, which shift on insert/remove.
+            if (self.displaysArray && (deletions.count > 0 || insertions.count > 0)) {
+                [self.realmTableView redrawAllRows];
+            }
+            else {
+                [self.realmTableView redrawRowsAtIndexes:modifications];
+            }
             [self updateStatusLabel];
         }
 
